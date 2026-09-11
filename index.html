@@ -3,160 +3,230 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RC Plane Designer - Quick Calc</title>
+    <title>RC Plane Sizer - Aerodynamic Calculator</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #f4f7f6;
             color: #333;
-            max-width: 600px;
+            max-width: 900px;
             margin: 40px auto;
             padding: 20px;
         }
-        h2 { text-align: center; color: #2c3e50; }
+        h2 { text-align: center; color: #2c3e50; margin-bottom: 30px; }
         
-        /* Tab Styles */
-        .tabs {
+        .container {
             display: flex;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #ddd;
-        }
-        .tab-btn {
-            background: none;
-            border: none;
-            padding: 10px 20px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: bold;
-            color: #7f8c8d;
-            transition: 0.3s;
-        }
-        .tab-btn:hover { color: #3498db; }
-        .tab-btn.active {
-            color: #2980b9;
-            border-bottom: 3px solid #2980b9;
+            gap: 20px;
+            flex-wrap: wrap;
         }
 
-        /* Content Styles */
-        .tab-content { display: none; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .tab-content.active { display: block; }
-        
-        .input-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
-        input { 
-            width: 100%; padding: 8px; box-sizing: border-box; 
-            border: 1px solid #ccc; border-radius: 4px; 
+        .panel {
+            background: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            flex: 1;
+            min-width: 300px;
         }
+
+        .panel h3 { margin-top: 0; color: #2980b9; border-bottom: 2px solid #ecf0f1; padding-bottom: 10px; }
+
+        .input-group, .output-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #555; }
         
-        /* Results Box */
-        .results {
-            margin-top: 20px; padding: 15px;
-            background-color: #e8f6f3; border-left: 4px solid #1abc9c;
-            border-radius: 4px;
+        input[type="number"] { 
+            width: 100%; padding: 10px; box-sizing: border-box; 
+            border: 1px solid #ccc; border-radius: 4px; font-size: 15px;
+            background-color: #fcfcfc;
+        }
+        input[type="number"]:focus { outline: none; border-color: #3498db; }
+
+        .output-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+        }
+        .output-row:last-child { border-bottom: none; }
+        .output-label { font-weight: bold; color: #444; }
+        
+        .vals { display: flex; gap: 15px; min-width: 160px; justify-content: flex-end;}
+        .val-ft { color: #2980b9; font-weight: bold; width: 75px; text-align: right;}
+        .val-in { color: #27ae60; font-weight: bold; width: 90px; text-align: right;}
+
+        .weight-callout {
+            background-color: #e8f6f3;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #1abc9c;
+            margin-bottom: 20px;
+            font-size: 15px;
         }
     </style>
 </head>
 <body>
 
-    <h2>RC Plane Designer</h2>
+    <h2>RC Plane Aerodynamic Sizer</h2>
 
-    <div class="tabs">
-        <button class="tab-btn active" onclick="openTab('structure')">Structure</button>
-        <button class="tab-btn" onclick="openTab('electronics')">Electronics</button>
-    </div>
+    <div class="container">
+        <!-- INPUT PANEL -->
+        <div class="panel">
+            <h3>Aircraft Inputs</h3>
+            <div class="input-group">
+                <label>Target Weight (grams)</label>
+                <input type="number" id="weight_g" value="1700" step="10" oninput="calculateSizing()">
+            </div>
+            <div class="input-group">
+                <label>Aspect Ratio</label>
+                <input type="number" id="ar" value="5.0" step="0.1" oninput="calculateSizing()">
+            </div>
+            <div class="input-group">
+                <label>Wing Cubic Loading (WCL)</label>
+                <input type="number" id="wcl" value="8.0" step="0.1" oninput="calculateSizing()">
+            </div>
+            <div class="input-group">
+                <label>Taper Ratio</label>
+                <input type="number" id="taper" value="0.5" step="0.05" oninput="calculateSizing()">
+            </div>
+            
+            <div style="margin-top: 30px; font-size: 12px; color: #7f8c8d;">
+                <strong>Design Rules Applied:</strong><br>
+                - Fuselage Length = 70% of Wingspan<br>
+                - Horizontal Stab Area = 15% of Wing Area<br>
+                - Vertical Stab Area = 33% of Horiz. Stab Area
+            </div>
+        </div>
 
-    <!-- STRUCTURE TAB -->
-    <div id="structure" class="tab-content active">
-        <div class="input-group">
-            <label>Wingspan (cm)</label>
-            <input type="number" id="wingspan" value="120" oninput="calculateAll()">
-        </div>
-        <div class="input-group">
-            <label>Average Wing Chord (cm)</label>
-            <input type="number" id="chord" value="20" oninput="calculateAll()">
-        </div>
-        <div class="input-group">
-            <label>Airframe & 3D Printed Parts Weight (g)</label>
-            <input type="number" id="airframeWeight" value="450" oninput="calculateAll()">
-        </div>
-        <div class="results">
-            <p><strong>Wing Area:</strong> <span id="wingAreaOut">0</span> cm²</p>
-        </div>
-    </div>
+        <!-- OUTPUT PANEL -->
+        <div class="panel">
+            <h3>Calculated Dimensions</h3>
+            
+            <div class="weight-callout">
+                <strong>Weight in Ounces:</strong> <span id="weight_oz" style="font-weight: bold; color: #1abc9c;">0</span> oz
+            </div>
 
-    <!-- ELECTRONICS TAB -->
-    <div id="electronics" class="tab-content">
-        <div class="input-group">
-            <label>Total Motor Thrust (g)</label>
-            <input type="number" id="thrust" value="850" oninput="calculateAll()">
-        </div>
-        <div class="input-group">
-            <label>Electronics Base Weight (Motors, ESC, Battery) (g)</label>
-            <input type="number" id="elecWeight" value="300" oninput="calculateAll()">
-        </div>
-        <div class="input-group">
-            <label>Payload Weight (FPV Camera, Sensors, Microcontrollers) (g)</label>
-            <input type="number" id="payloadWeight" value="80" oninput="calculateAll()">
-        </div>
-        <div class="results">
-            <p><strong>Total Flying Weight:</strong> <span id="totalWeightOut">0</span> g</p>
-            <p><strong>Thrust-to-Weight Ratio:</strong> <span id="twrOut">0</span></p>
-            <p><strong>Wing Loading:</strong> <span id="wingLoadOut">0</span> g/cm²</p>
-            <p><small id="flightStatus"></small></p>
+            <div style="display:flex; justify-content: flex-end; gap: 15px; font-size: 11px; color:#888; font-weight:bold; margin-bottom: 5px; padding-right: 5px;">
+                <span style="width: 75px; text-align: right;">Feet (ft / ft²)</span>
+                <span style="width: 90px; text-align: right;">Inches (in / in²)</span>
+            </div>
+
+            <div class="output-row">
+                <span class="output-label">Wing Area</span>
+                <div class="vals"><span class="val-ft" id="area_ft">0</span><span class="val-in" id="area_in">0</span></div>
+            </div>
+            <div class="output-row">
+                <span class="output-label">Wing Span</span>
+                <div class="vals"><span class="val-ft" id="span_ft">0</span><span class="val-in" id="span_in">0</span></div>
+            </div>
+            <div class="output-row">
+                <span class="output-label">Average Wing Chord</span>
+                <div class="vals"><span class="val-ft" id="chord_ft">0</span><span class="val-in" id="chord_in">0</span></div>
+            </div>
+            <div class="output-row">
+                <span class="output-label">Root Chord</span>
+                <div class="vals"><span class="val-ft" id="root_ft">0</span><span class="val-in" id="root_in">0</span></div>
+            </div>
+            <div class="output-row">
+                <span class="output-label">Tip Chord</span>
+                <div class="vals"><span class="val-ft" id="tip_ft">0</span><span class="val-in" id="tip_in">0</span></div>
+            </div>
+            <div class="output-row">
+                <span class="output-label">Fuselage Length</span>
+                <div class="vals"><span class="val-ft" id="fuse_l_ft">0</span><span class="val-in" id="fuse_l_in">0</span></div>
+            </div>
+            <div class="output-row">
+                <span class="output-label">Fuselage Height</span>
+                <div class="vals"><span class="val-ft" id="fuse_h_ft">0</span><span class="val-in" id="fuse_h_in">0</span></div>
+            </div>
+            <div class="output-row">
+                <span class="output-label">Area of Horiz. Stab (HS)</span>
+                <div class="vals"><span class="val-ft" id="ahs_ft">0</span><span class="val-in" id="ahs_in">0</span></div>
+            </div>
+            <div class="output-row">
+                <span class="output-label">Span (Length) of HS</span>
+                <div class="vals"><span class="val-ft" id="lhs_ft">0</span><span class="val-in" id="lhs_in">0</span></div>
+            </div>
+            <div class="output-row">
+                <span class="output-label">Chord (Width) of HS</span>
+                <div class="vals"><span class="val-ft" id="whs_ft">0</span><span class="val-in" id="whs_in">0</span></div>
+            </div>
+            <div class="output-row">
+                <span class="output-label">Area of Vert. Stab (VS)</span>
+                <div class="vals"><span class="val-ft" id="avs_ft">0</span><span class="val-in" id="avs_in">0</span></div>
+            </div>
+            <div class="output-row">
+                <span class="output-label">Height of VS</span>
+                <div class="vals"><span class="val-ft" id="hvs_ft">0</span><span class="val-in" id="hvs_in">0</span></div>
+            </div>
+            <div class="output-row">
+                <span class="output-label">Chord (Width) of VS</span>
+                <div class="vals"><span class="val-ft" id="wvs_ft">0</span><span class="val-in" id="wvs_in">0</span></div>
+            </div>
         </div>
     </div>
 
     <script>
-        // Tab switching logic
-        function openTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        function calculateSizing() {
+            // Get inputs
+            const w_g = parseFloat(document.getElementById('weight_g').value) || 0;
+            const ar = parseFloat(document.getElementById('ar').value) || 1;
+            const wcl = parseFloat(document.getElementById('wcl').value) || 1;
+            const taper = parseFloat(document.getElementById('taper').value) || 1;
+
+            // Base conversions matching excel multiplier
+            const w_oz = w_g * 0.0353;
             
-            document.getElementById(tabId).classList.add('active');
-            event.currentTarget.classList.add('active');
+            // Wing Calculations
+            const area_ft = Math.pow((w_oz / wcl), (2/3));
+            const span_ft = Math.pow((ar * area_ft), 0.5);
+            const chord_ft = area_ft / span_ft;
+            
+            // Fix: Dynamic Root/Tip Chord based on Taper Ratio formula: C_avg = (Cr + Ct)/2
+            const root_ft = (2 * chord_ft) / (1 + taper);
+            const tip_ft = root_ft * taper;
+
+            // Fuselage Calculations (70% span rule)
+            const fuse_l_ft = 0.7 * span_ft;
+            const fuse_h_ft = 0.1 * fuse_l_ft;
+
+            // Horizontal Stabilizer Calculations
+            const ahs_ft = 0.15 * area_ft;
+            const whs_ft = 0.15 * fuse_l_ft; // Width / Chord
+            const lhs_ft = ahs_ft / whs_ft; // Length / Span
+
+            // Vertical Stabilizer Calculations
+            const avs_ft = 0.33 * ahs_ft;
+            const wvs_ft = whs_ft; 
+            const hvs_ft = avs_ft / wvs_ft;
+
+            // Update UI Helper function to format 2-3 decimal places and output both ft and inches
+            const updateUI = (id, val_ft, isArea = false) => {
+                const multiplier = isArea ? 144 : 12;
+                document.getElementById(id + '_ft').innerText = val_ft.toFixed(3);
+                document.getElementById(id + '_in').innerText = (val_ft * multiplier).toFixed(3);
+            };
+
+            // Write to DOM
+            document.getElementById('weight_oz').innerText = w_oz.toFixed(2);
+            updateUI('area', area_ft, true);
+            updateUI('span', span_ft);
+            updateUI('chord', chord_ft);
+            updateUI('root', root_ft);
+            updateUI('tip', tip_ft);
+            updateUI('fuse_l', fuse_l_ft);
+            updateUI('fuse_h', fuse_h_ft);
+            updateUI('ahs', ahs_ft, true);
+            updateUI('lhs', lhs_ft);
+            updateUI('whs', whs_ft);
+            updateUI('avs', avs_ft, true);
+            updateUI('hvs', hvs_ft);
+            updateUI('wvs', wvs_ft);
         }
 
-        // Calculation logic
-        function calculateAll() {
-            // Get Structure values
-            let span = parseFloat(document.getElementById('wingspan').value) || 0;
-            let chord = parseFloat(document.getElementById('chord').value) || 0;
-            let airframeW = parseFloat(document.getElementById('airframeWeight').value) || 0;
-
-            // Get Electronics values
-            let thrust = parseFloat(document.getElementById('thrust').value) || 0;
-            let elecW = parseFloat(document.getElementById('elecWeight').value) || 0;
-            let payloadW = parseFloat(document.getElementById('payloadWeight').value) || 0;
-
-            // Math
-            let wingArea = span * chord;
-            let totalWeight = airframeW + elecW + payloadW;
-            let twr = totalWeight > 0 ? (thrust / totalWeight).toFixed(2) : 0;
-            let wingLoading = wingArea > 0 ? (totalWeight / wingArea).toFixed(2) : 0;
-
-            // Update UI
-            document.getElementById('wingAreaOut').innerText = wingArea;
-            document.getElementById('totalWeightOut').innerText = totalWeight;
-            document.getElementById('twrOut').innerText = twr;
-            document.getElementById('wingLoadOut').innerText = wingLoading;
-
-            // Simple flight assessment
-            let statusEl = document.getElementById('flightStatus');
-            if (twr < 0.8) {
-                statusEl.innerText = "Warning: Thrust-to-Weight ratio is low. The plane might struggle to take off.";
-                statusEl.style.color = "red";
-            } else if (twr >= 1.0) {
-                statusEl.innerText = "Excellent: TWR is 1.0+. Plenty of power for acrobatics or rapid climbs.";
-                statusEl.style.color = "green";
-            } else {
-                statusEl.innerText = "Good: Adequate power for smooth, scale flight.";
-                statusEl.style.color = "#d35400";
-            }
-        }
-
-        // Run once on load
-        calculateAll();
+        // Run calculation instantly on page load
+        calculateSizing();
     </script>
 </body>
 </html>
-
