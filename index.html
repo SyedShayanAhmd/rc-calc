@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RC Plane Designer - Quick Calc</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+        h2 { text-align: center; color: #2c3e50; }
+        
+        /* Tab Styles */
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ddd;
+        }
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            color: #7f8c8d;
+            transition: 0.3s;
+        }
+        .tab-btn:hover { color: #3498db; }
+        .tab-btn.active {
+            color: #2980b9;
+            border-bottom: 3px solid #2980b9;
+        }
+
+        /* Content Styles */
+        .tab-content { display: none; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .tab-content.active { display: block; }
+        
+        .input-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
+        input { 
+            width: 100%; padding: 8px; box-sizing: border-box; 
+            border: 1px solid #ccc; border-radius: 4px; 
+        }
+        
+        /* Results Box */
+        .results {
+            margin-top: 20px; padding: 15px;
+            background-color: #e8f6f3; border-left: 4px solid #1abc9c;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>RC Plane Designer</h2>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="openTab('structure')">Structure</button>
+        <button class="tab-btn" onclick="openTab('electronics')">Electronics</button>
+    </div>
+
+    <!-- STRUCTURE TAB -->
+    <div id="structure" class="tab-content active">
+        <div class="input-group">
+            <label>Wingspan (cm)</label>
+            <input type="number" id="wingspan" value="120" oninput="calculateAll()">
+        </div>
+        <div class="input-group">
+            <label>Average Wing Chord (cm)</label>
+            <input type="number" id="chord" value="20" oninput="calculateAll()">
+        </div>
+        <div class="input-group">
+            <label>Airframe & 3D Printed Parts Weight (g)</label>
+            <input type="number" id="airframeWeight" value="450" oninput="calculateAll()">
+        </div>
+        <div class="results">
+            <p><strong>Wing Area:</strong> <span id="wingAreaOut">0</span> cm²</p>
+        </div>
+    </div>
+
+    <!-- ELECTRONICS TAB -->
+    <div id="electronics" class="tab-content">
+        <div class="input-group">
+            <label>Total Motor Thrust (g)</label>
+            <input type="number" id="thrust" value="850" oninput="calculateAll()">
+        </div>
+        <div class="input-group">
+            <label>Electronics Base Weight (Motors, ESC, Battery) (g)</label>
+            <input type="number" id="elecWeight" value="300" oninput="calculateAll()">
+        </div>
+        <div class="input-group">
+            <label>Payload Weight (FPV Camera, Sensors, Microcontrollers) (g)</label>
+            <input type="number" id="payloadWeight" value="80" oninput="calculateAll()">
+        </div>
+        <div class="results">
+            <p><strong>Total Flying Weight:</strong> <span id="totalWeightOut">0</span> g</p>
+            <p><strong>Thrust-to-Weight Ratio:</strong> <span id="twrOut">0</span></p>
+            <p><strong>Wing Loading:</strong> <span id="wingLoadOut">0</span> g/cm²</p>
+            <p><small id="flightStatus"></small></p>
+        </div>
+    </div>
+
+    <script>
+        // Tab switching logic
+        function openTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById(tabId).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+
+        // Calculation logic
+        function calculateAll() {
+            // Get Structure values
+            let span = parseFloat(document.getElementById('wingspan').value) || 0;
+            let chord = parseFloat(document.getElementById('chord').value) || 0;
+            let airframeW = parseFloat(document.getElementById('airframeWeight').value) || 0;
+
+            // Get Electronics values
+            let thrust = parseFloat(document.getElementById('thrust').value) || 0;
+            let elecW = parseFloat(document.getElementById('elecWeight').value) || 0;
+            let payloadW = parseFloat(document.getElementById('payloadWeight').value) || 0;
+
+            // Math
+            let wingArea = span * chord;
+            let totalWeight = airframeW + elecW + payloadW;
+            let twr = totalWeight > 0 ? (thrust / totalWeight).toFixed(2) : 0;
+            let wingLoading = wingArea > 0 ? (totalWeight / wingArea).toFixed(2) : 0;
+
+            // Update UI
+            document.getElementById('wingAreaOut').innerText = wingArea;
+            document.getElementById('totalWeightOut').innerText = totalWeight;
+            document.getElementById('twrOut').innerText = twr;
+            document.getElementById('wingLoadOut').innerText = wingLoading;
+
+            // Simple flight assessment
+            let statusEl = document.getElementById('flightStatus');
+            if (twr < 0.8) {
+                statusEl.innerText = "Warning: Thrust-to-Weight ratio is low. The plane might struggle to take off.";
+                statusEl.style.color = "red";
+            } else if (twr >= 1.0) {
+                statusEl.innerText = "Excellent: TWR is 1.0+. Plenty of power for acrobatics or rapid climbs.";
+                statusEl.style.color = "green";
+            } else {
+                statusEl.innerText = "Good: Adequate power for smooth, scale flight.";
+                statusEl.style.color = "#d35400";
+            }
+        }
+
+        // Run once on load
+        calculateAll();
+    </script>
+</body>
+</html>
