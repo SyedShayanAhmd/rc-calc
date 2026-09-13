@@ -2,24 +2,50 @@
 <html><head><meta charset="UTF-8"><title>RC Suite — 3D Viewer</title><link rel="stylesheet" href="style.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script><script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script></head><body>
     <div class="nav"><a href="index.html">1. Sizer</a><a href="airfoil.html">2. Airfoil</a><a href="electronics.html">3. Electronics</a><a href="cg.html">4. CG</a><a href="gear.html">5. Gear</a><a href="viewer.html" class="active">6. 3D</a><a href="help.html">? Help</a></div>
+    
+    <div class="sync-flag"><span class="dot"></span>Internal components (Motor, Battery, ESC) are synced live from your CG Analysis table.</div>
+
     <div class="panel tick">
-        <div id="3d-container" style="height: 540px; width: 100%;"></div>
+        <div id="3d-container" style="height: 600px; width: 100%;"></div>
     </div>
+    
     <script src="state.js"></script><script>
         const container = document.getElementById('3d-container');
-        const scene = new THREE.Scene(); scene.background = new THREE.Color(0x1c2a39); // NX Blue
-        const camera = new THREE.PerspectiveCamera(50, container.clientWidth/540, 0.1, 1000);
+        const scene = new THREE.Scene(); 
+        scene.background = new THREE.Color(0x1c2a39); 
+        
+        const camera = new THREE.PerspectiveCamera(45, container.clientWidth/600, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({antialias:true});
-        renderer.setSize(container.clientWidth, 540); container.appendChild(renderer.domElement);
+        renderer.setSize(container.clientWidth, 600); 
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
         
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        const light = new THREE.DirectionalLight(0xffffff, 1); light.position.set(10, 20, 10); scene.add(light);
-        scene.add(new THREE.AmbientLight(0x556677));
-        const grid = new THREE.GridHelper(50, 50, 0x445566, 0x223344); scene.add(grid);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
 
-        let group = new THREE.Group(); scene.add(group);
+        // Lighting for CAD aesthetic
+        const light = new THREE.DirectionalLight(0xffffff, 0.9); 
+        light.position.set(20, 30, -10); 
+        light.castShadow = true;
+        light.shadow.mapSize.width = 2048;
+        light.shadow.mapSize.height = 2048;
+        scene.add(light);
+        
+        const fillLight = new THREE.DirectionalLight(0xaabbcc, 0.4);
+        fillLight.position.set(-20, 10, 20);
+        scene.add(fillLight);
+        scene.add(new THREE.AmbientLight(0x445566, 0.6));
+        
+        const grid = new THREE.GridHelper(200, 100, 0x334455, 0x223344); 
+        grid.position.y = -10;
+        scene.add(grid);
 
-        function getNACAShape(code, rootC) {
+        let group = new THREE.Group(); 
+        scene.add(group);
+
+        function getNACAShape(code, chord) {
             const shape = new THREE.Shape();
             let m=parseInt(code[0])/100, p=parseInt(code[1])/10, t=parseInt(code.substr(2,2))/100;
             if(code==='clarky'){ m=0.034; p=0.3; t=0.117; } if(p===0) p=0.4;
@@ -27,12 +53,12 @@
             for(let i=0; i<=100; i++) {
                 const x = i/100, yc = x<p ? (m/(p*p))*(2*p*x-x*x) : (m/Math.pow(1-p,2))*((1-2*p)+2*p*x-x*x);
                 const yt = 5*t*(0.2969*Math.sqrt(x)-0.1260*x-0.3516*x*x+0.2843*Math.pow(x,3)-0.1015*Math.pow(x,4));
-                shape.lineTo(x*rootC, yc*rootC + yt*rootC);
+                shape.lineTo(x*chord, yc*chord + yt*chord);
             }
             for(let i=100; i>=0; i--) {
                 const x = i/100, yc = x<p ? (m/(p*p))*(2*p*x-x*x) : (m/Math.pow(1-p,2))*((1-2*p)+2*p*x-x*x);
                 const yt = 5*t*(0.2969*Math.sqrt(x)-0.1260*x-0.3516*x*x+0.2843*Math.pow(x,3)-0.1015*Math.pow(x,4));
-                shape.lineTo(x*rootC, yc*rootC - yt*rootC);
+                shape.lineTo(x*chord, yc*chord - yt*chord);
             }
             return shape;
         }
@@ -42,50 +68,126 @@
             const pos = geo.attributes.position;
             for(let i=0; i<pos.count; i++) {
                 const z = pos.getZ(i), scale = 1 - (1 - taper) * (z / spanHalf);
-                pos.setX(i, pos.getX(i)*scale); pos.setY(i, pos.getY(i)*scale);
+                pos.setX(i, pos.getX(i)*scale); 
+                pos.setY(i, pos.getY(i)*scale);
             }
-            geo.computeVertexNormals(); return geo;
+            geo.computeVertexNormals(); 
+            return geo;
         }
 
         function build() {
             while(group.children.length) group.remove(group.children[0]);
-            const st = RCState.get();
-            const fL = st.fuseLength_cm/10, fH = st.fuseHeight_cm/10, spanHalf = (st.span_cm/10)/2;
-            const rC = st.rootChord_cm/10, taper = st.taperRatio, le = st.wingLEPosition_mm/100;
-            const hsSpanHalf = (st.hsSpan_cm/10)/2, hsC = st.hsChord_cm/10, vsH = st.vsHeight_cm/10, vsC = st.vsChord_cm/10;
-
-            const mat = new THREE.MeshPhongMaterial({color: 0xff7a1a, flatShading: false});
-            const matF = new THREE.MeshPhongMaterial({color: 0x99aabb, transparent: true, opacity: 0.8});
             
-            // Fuselage (0 is nose)
-            const fuse = new THREE.Mesh(new THREE.BoxGeometry(fH, fH, fL), matF);
-            fuse.position.set(0, fH, fL/2); group.add(fuse);
+            const st = RCState.get();
+            const fL = (st.fuselageLength_mm || st.fuseLength_cm*10 || 850) / 10; // cm
+            const fH = st.fuseHeight_cm || (fL * 0.1);
+            const fuseW = (st.rootChord_cm || 25) * 0.35;
+            
+            const spanHalf = (st.span_cm || 120)/2;
+            const rC = st.rootChord_cm || 25;
+            const taper = st.taperRatio || 0.6;
+            const le = (st.wingLEPosition_mm || 250) / 10; // Z-position of wing leading edge
+            
+            const hsSpanHalf = (st.hsSpan_cm || 38)/2;
+            const hsC = st.hsChord_cm || 9.6;
+            const vsH = st.vsHeight_cm || 13.4;
+            const vsC = st.vsChord_cm || 8.9;
 
-            // Wing (Parametric NACA + Taper)
+            const matWing = new THREE.MeshPhongMaterial({color: 0xff7a1a, flatShading: false});
+            const matTail = new THREE.MeshPhongMaterial({color: 0x3ddbc4, flatShading: false});
+            const matFuse = new THREE.MeshPhongMaterial({color: 0x99aabb, transparent: true, opacity: 0.25, depthWrite: false});
+            
+            // Fuselage (Origin Z=0 is the nose)
+            const fuse = new THREE.Mesh(new THREE.BoxGeometry(fuseW, fH, fL), matFuse);
+            fuse.position.set(0, fH/2, fL/2); 
+            fuse.castShadow = true;
+            group.add(fuse);
+
+            // Wing (Correctly shifted to LE and offset to fuselage sides)
             const shape = getNACAShape(st.airfoilCode || '2412', rC);
-            const rWing = new THREE.Mesh(createTaperedExtrusion(shape, spanHalf, taper), mat);
-            rWing.rotation.y = -Math.PI/2; rWing.position.set(0, fH*1.5, le); group.add(rWing);
-            const lWing = new THREE.Mesh(createTaperedExtrusion(shape, spanHalf, taper), mat);
-            lWing.rotation.y = Math.PI/2; lWing.position.set(0, fH*1.5, le); group.add(lWing);
+            
+            const rWing = new THREE.Mesh(createTaperedExtrusion(shape, spanHalf, taper), matWing);
+            rWing.rotation.y = -Math.PI/2; 
+            rWing.position.set(fuseW/2, fH*0.8, le); 
+            rWing.castShadow = true;
+            group.add(rWing);
+            
+            const lWing = new THREE.Mesh(createTaperedExtrusion(shape, spanHalf, taper), matWing);
+            lWing.rotation.y = Math.PI/2; 
+            lWing.position.set(-fuseW/2, fH*0.8, le); 
+            lWing.castShadow = true;
+            group.add(lWing);
 
             // Empennage
             const hsShape = getNACAShape('0012', hsC);
-            const rHS = new THREE.Mesh(createTaperedExtrusion(hsShape, hsSpanHalf, 1.0), mat);
-            rHS.rotation.y = -Math.PI/2; rHS.position.set(0, fH, fL - hsC); group.add(rHS);
-            const lHS = new THREE.Mesh(createTaperedExtrusion(hsShape, hsSpanHalf, 1.0), mat);
-            lHS.rotation.y = Math.PI/2; lHS.position.set(0, fH, fL - hsC); group.add(lHS);
+            const rHS = new THREE.Mesh(createTaperedExtrusion(hsShape, hsSpanHalf, 1.0), matTail);
+            rHS.rotation.y = -Math.PI/2; 
+            rHS.position.set(fuseW/2, fH*0.5, fL - hsC); 
+            group.add(rHS);
+            
+            const lHS = new THREE.Mesh(createTaperedExtrusion(hsShape, hsSpanHalf, 1.0), matTail);
+            lHS.rotation.y = Math.PI/2; 
+            lHS.position.set(-fuseW/2, fH*0.5, fL - hsC); 
+            group.add(lHS);
             
             const vsShape = getNACAShape('0012', vsC);
-            const vs = new THREE.Mesh(createTaperedExtrusion(vsShape, vsH, 0.6), mat);
-            vs.rotation.x = -Math.PI/2; vs.rotation.z = Math.PI/2; vs.position.set(0, fH, fL - vsC); group.add(vs);
+            const vs = new THREE.Mesh(createTaperedExtrusion(vsShape, vsH, 0.5), matTail);
+            vs.rotation.x = -Math.PI/2; 
+            vs.rotation.z = Math.PI/2; 
+            vs.position.set(0, fH, fL - vsC); 
+            group.add(vs);
+
+            // Internal Electronics rendering from CG Table
+            if(st.components) {
+                st.components.forEach(c => {
+                    const zPos = c.d / 10; // Convert mm to cm
+                    const name = c.n.toLowerCase();
+                    let mesh;
+                    
+                    if (name.includes('motor')) {
+                        mesh = new THREE.Mesh(new THREE.CylinderGeometry(fuseW*0.4, fuseW*0.4, fH*0.6, 16), new THREE.MeshPhongMaterial({color: 0x333333}));
+                        mesh.rotation.x = Math.PI/2;
+                    } else if (name.includes('battery') || name.includes('batt')) {
+                        mesh = new THREE.Mesh(new THREE.BoxGeometry(fuseW*0.7, fH*0.5, fH*1.2), new THREE.MeshPhongMaterial({color: 0x3ddbc4}));
+                    } else if (name.includes('esc')) {
+                        mesh = new THREE.Mesh(new THREE.BoxGeometry(fuseW*0.5, fH*0.15, fH*0.6), new THREE.MeshPhongMaterial({color: 0xf2b84b}));
+                    } else if (!name.includes('wing')) {
+                        mesh = new THREE.Mesh(new THREE.BoxGeometry(fuseW*0.4, fH*0.4, fH*0.4), new THREE.MeshPhongMaterial({color: 0x8899aa}));
+                    }
+
+                    if(mesh) {
+                        mesh.position.set(0, fH/2, zPos);
+                        mesh.castShadow = true;
+                        group.add(mesh);
+                    }
+                });
+            }
 
             // CG Marker
-            const cg = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 16), new THREE.MeshBasicMaterial({color: 0xff2f2f}));
-            cg.position.set(0, fH, st.cgPosition_mm/100); group.add(cg);
+            if(st.cgPosition_mm) {
+                const cg = new THREE.Mesh(new THREE.SphereGeometry(1.5, 16, 16), new THREE.MeshBasicMaterial({color: 0xff6259}));
+                cg.position.set(0, fH*1.2, st.cgPosition_mm/10); 
+                group.add(cg);
+            }
 
-            controls.target.set(0, fH, fL/2); camera.position.set(15, 15, -15);
+            controls.target.set(0, fH/2, fL/2); 
+            camera.position.set(fL*0.8, fL*0.5, -fL*0.4);
         }
-        build(); RCState.onChange(build);
-        function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); } animate();
+        
+        build(); 
+        RCState.onChange(build);
+        
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / 600;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, 600);
+        });
+
+        function animate() { 
+            requestAnimationFrame(animate); 
+            controls.update(); 
+            renderer.render(scene, camera); 
+        } 
+        animate();
     </script>
 </body></html>
