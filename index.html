@@ -1,45 +1,118 @@
 <!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>RC Suite — Sizer</title><link rel="stylesheet" href="style.css"></head><body>
     <div class="nav"><a href="index.html" class="active">1. Sizer</a><a href="airfoil.html">2. Airfoil</a><a href="electronics.html">3. Electronics</a><a href="cg.html">4. CG</a><a href="gear.html">5. Gear</a><a href="viewer.html">6. 3D</a><a href="help.html">? Help</a></div>
-    <div class="grid"><div class="panel">
-        <h3>Inputs</h3>
-        <label>Weight (g)</label><input type="number" id="w" oninput="c()">
-        <label>Aspect Ratio <span class="cite" tabindex="0" data-note="Raymer Ch.4: AR = b² / S">i</span></label><input type="number" id="ar" oninput="c()">
-        <label>Wing Cubic Loading (oz/ft³) <span class="cite" tabindex="0" data-note="Andy Lennon: WCL = W / S^(1.5). Empirical density sizing for RC models.">i</span></label><input type="number" id="wcl" oninput="c()">
-        <label>Taper Ratio (λ) <span class="cite" tabindex="0" data-note="Raymer Ch.4: λ = Tip Chord / Root Chord">i</span></label><input type="number" id="tr" step="0.05" oninput="c()">
+    <div class="grid">
+        <div class="panel">
+            <h3>Aircraft Sizing Calculator</h3>
+            <label>Enter the desired MTOW in grams:</label>
+            <input type="number" id="w" oninput="c()">
+            
+            <label>Enter the desired wing cubical loading:</label>
+            <input type="number" id="wcl" oninput="c()">
+            
+            <label>Enter the desired aspect ratio:</label>
+            <input type="number" id="ar" oninput="c()">
+            
+            <label>Select the desired wing configuration:</label>
+            <select id="config" onchange="c()">
+                <option value="1.0">Rectangular</option>
+                <option value="0.6">Tapered</option>
+            </select>
+        </div>
+        <div class="panel">
+            <h3>Geometry Outputs</h3>
+            <!-- Set to 2 columns to comfortably fit all 18 variables -->
+            <div class="stat-grid" id="out" style="grid-template-columns: repeat(2, 1fr);"></div>
+        </div>
     </div>
-    <div class="panel"><h3>Geometry</h3><div class="stat-grid" id="out"></div></div></div>
+    
     <script src="state.js"></script><script>
         const st = RCState.get();
-        ['w','ar','wcl','tr'].forEach(id => document.getElementById(id).value = st[{w:'weight_g',ar:'aspectRatio',wcl:'wingCubicLoading',tr:'taperRatio'}[id]]);
+        document.getElementById('w').value = st.weight_g || 1500;
+        document.getElementById('wcl').value = st.wingCubicLoading || 7;
+        document.getElementById('ar').value = st.aspectRatio || 6;
+        document.getElementById('config').value = st.taperRatio || 1.0;
         
         function c() {
-            const w = Number(document.getElementById('w').value), ar = Number(document.getElementById('ar').value);
-            const wcl = Number(document.getElementById('wcl').value), tr = Number(document.getElementById('tr').value);
-            
-            const area_dm2 = Math.pow(w / wcl, 2 / 3);
-            const span_cm = Math.sqrt(ar * area_dm2) * 10;
-            const meanChord_cm = (area_dm2 * 100) / span_cm;
-            const rootChord_cm = (2 * meanChord_cm) / (1 + tr), tipChord_cm = rootChord_cm * tr;
-            
-            const fuseLength_cm = span_cm * 0.70;
-            const fuseHeight_cm = fuseLength_cm * 0.10;
-            const hsArea_dm2 = area_dm2 * 0.15;
-            const hsSpan_cm = Math.sqrt(4.5 * hsArea_dm2) * 10; // Assumed AR 4.5
-            const hsChord_cm = (hsArea_dm2 * 100) / hsSpan_cm;
-            const vsArea_dm2 = hsArea_dm2 * 0.33;
-            const vsHeight_cm = Math.sqrt(1.5 * vsArea_dm2) * 10; // Assumed AR 1.5
-            const vsChord_cm = (vsArea_dm2 * 100) / vsHeight_cm;
+            const w_g = Number(document.getElementById('w').value);
+            const wcl = Number(document.getElementById('wcl').value);
+            const ar = Number(document.getElementById('ar').value);
+            const taperRatio = Number(document.getElementById('config').value);
 
+            // 1. Math matching your exact spreadsheet reference ratios
+            const w_oz = w_g * 0.03527396195; // Exact conversion factor to match your screenshot
+            
+            const area_sqft = Math.pow(w_oz / wcl, 2/3);
+            const wing_area_sqin = area_sqft * 144;
+            const wing_span_in = Math.sqrt(ar * area_sqft) * 12;
+            const chord_in = wing_area_sqin / wing_span_in;
+            const wing_loading = w_oz / area_sqft;
+
+            const fuse_length_in = wing_span_in * 0.7;
+            const fuse_height_in = fuse_length_in * 0.1;
+
+            const hs_area_sqin = wing_area_sqin * 0.3;
+            const hs_length_in = wing_span_in / 2.1;
+            const hs_width_in = hs_area_sqin / hs_length_in;
+
+            const vs_area_sqin = hs_area_sqin * 0.5;
+            const vs_width_in = hs_width_in;
+            const vs_height_in = vs_area_sqin / vs_width_in;
+
+            const aileron_length_in = wing_span_in * 0.3;
+            const aileron_width_in = chord_in * 0.2;
+
+            const rudder_height_in = vs_height_in;
+            const rudder_width_in = vs_width_in * 0.35;
+
+            const elevator_length_in = hs_length_in;
+            const elevator_width_in = hs_width_in * 0.35;
+
+            // 2. Render to UI (Outputting unrounded values to match your screenshot exactly)
             RCState.renderStats(document.getElementById('out'), {
-                'Wing Area': { value: area_dm2.toFixed(1) + ' dm²', note: 'Lennon WCL Equation' },
-                'Wing Span': { value: span_cm.toFixed(1) + ' cm', note: 'b = √(AR · S)' },
-                'Root / Tip Chord': rootChord_cm.toFixed(1) + ' / ' + tipChord_cm.toFixed(1) + ' cm',
-                'Fuselage L / H': { value: fuseLength_cm.toFixed(1) + ' / ' + fuseHeight_cm.toFixed(1) + ' cm', note: 'Empirical: L = 70% Span, H = 10% L' },
-                'Horiz. Stab (Area / Span)': { value: hsArea_dm2.toFixed(1) + ' dm² / ' + hsSpan_cm.toFixed(1) + ' cm', note: 'Area = 15% Wing Area' },
-                'Vert. Stab (Area / H)': { value: vsArea_dm2.toFixed(2) + ' dm² / ' + vsHeight_cm.toFixed(1) + ' cm', note: 'Area = 33% HS Area' }
+                'Wing Area (sq in)': wing_area_sqin,
+                'Wing Span (in)': wing_span_in,
+                'Chord Length (in)': chord_in,
+                'Wing loading (oz/sq ft)': wing_loading,
+                'Fuselage Length (in)': fuse_length_in,
+                'Fuselage Height (in)': fuse_height_in,
+                'Width of Horiz. Stab (in)': hs_width_in,
+                'Length of Horiz. Stab (in)': hs_length_in,
+                'Area of Horiz. Stab (sq in)': hs_area_sqin,
+                'Width of Vert. Stab (in)': vs_width_in,
+                'Height of Vert. Stab (in)': vs_height_in,
+                'Area of Vert. Stab (sq in)': vs_area_sqin,
+                'Aileron Length (in)': aileron_length_in,
+                'Aileron Width (in)': aileron_width_in,
+                'Rudder Height (in)': rudder_height_in,
+                'Rudder Width (in)': rudder_width_in,
+                'Elevator Length (in)': elevator_length_in,
+                'Elevator Width (in)': elevator_width_in
             });
-            RCState.set({ weight_g: w, aspectRatio: ar, wingCubicLoading: wcl, taperRatio: tr, area_dm2, span_cm, rootChord_cm, tipChord_cm, meanChord_cm, fuseLength_cm, fuseHeight_cm, hsArea_dm2, hsSpan_cm, hsChord_cm, vsArea_dm2, vsHeight_cm, vsChord_cm, fuselageLength_mm: fuseLength_cm * 10 });
-        } c();
+
+            // 3. Save Metric conversions to state so 3D viewer & CG keep working flawlessly
+            const span_cm = wing_span_in * 2.54;
+            const meanChord_cm = chord_in * 2.54;
+            const rootChord_cm = (2 * meanChord_cm) / (1 + taperRatio);
+            const tipChord_cm = rootChord_cm * taperRatio;
+            
+            RCState.set({
+                weight_g: w_g, 
+                aspectRatio: ar, 
+                wingCubicLoading: wcl, 
+                taperRatio: taperRatio,
+                span_cm: span_cm, 
+                rootChord_cm: rootChord_cm, 
+                tipChord_cm: tipChord_cm, 
+                fuseLength_cm: fuse_length_in * 2.54, 
+                fuseHeight_cm: fuse_height_in * 2.54,
+                hsSpan_cm: hs_length_in * 2.54, 
+                hsChord_cm: hs_width_in * 2.54, 
+                vsHeight_cm: vs_height_in * 2.54, 
+                vsChord_cm: vs_width_in * 2.54,
+                fuselageLength_mm: (fuse_length_in * 2.54) * 10
+            });
+        }
+        c();
     </script>
 </body></html>
