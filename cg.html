@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html><head><link rel="stylesheet" href="style.css"></head><body>
+    <div class="nav">
+        <a href="index.html">1. Sizer</a><a href="airfoil.html">2. Airfoil</a>
+        <a href="electronics.html">3. Electronics</a><a href="cg.html" class="active">4. CG Analysis</a>
+        <a href="gear.html">5. Landing Gear</a><a href="viewer.html">6. 3D Viewer</a>
+    </div>
+    <div class="panel">
+        <p><i>Note: Set Datum (0 mm) at the absolute tip of the nose.</i></p>
+        <table id="cgTbl">
+            <tr><th>Component</th><th>Weight (g)</th><th>Distance from Nose (mm)</th><th>Moment (g·mm)</th><th>X</th></tr>
+        </table>
+        <button onclick="add()" style="margin-top:10px;">+ Add Component</button>
+        <div class="stat-grid" style="margin-top:20px;">
+            <div class="stat-box">Total Weight<span id="tw">0 g</span></div>
+            <div class="stat-box">Total Moment<span id="tm">0</span></div>
+            <div class="stat-box">CG Position<span id="cg">0 mm</span></div>
+        </div>
+    </div>
+    <script>
+        let comps = [{n:"Motor",w:100,d:10}, {n:"Battery",w:250,d:150}, {n:"Wing",w:400,d:300}];
+        function draw() {
+            let t = document.getElementById('cgTbl'), tw=0, tm=0;
+            while(t.rows.length > 1) t.deleteRow(1);
+            comps.forEach((c, i) => {
+                let m = c.w * c.d; tw+=c.w; tm+=m;
+                t.innerHTML += `<tr><td><input value="${c.n}" oninput="comps[${i}].n=this.value"></td>
+                <td><input type="number" value="${c.w}" oninput="comps[${i}].w=Number(this.value); draw()"></td>
+                <td><input type="number" value="${c.d}" oninput="comps[${i}].d=Number(this.value); draw()"></td>
+                <td>${m}</td><td><button onclick="comps.splice(${i},1); draw()">X</button></td></tr>`;
+            });
+            document.getElementById('tw').innerText = tw + " g";
+            document.getElementById('tm').innerText = tm;
+            document.getElementById('cg').innerText = tw>0 ? (tm/tw).toFixed(1) + " mm" : "0 mm";
+        }
+        function add() { comps.push({n:"New",w:0,d:0}); draw(); } draw();
+    </script>
+</body></html>
