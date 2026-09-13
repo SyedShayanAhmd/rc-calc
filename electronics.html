@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html><head><link rel="stylesheet" href="style.css"><script src="https://cdn.jsdelivr.net/npm/chart.js"></script></head><body>
+    <div class="nav">
+        <a href="index.html">1. Sizer</a><a href="airfoil.html">2. Airfoil</a>
+        <a href="electronics.html" class="active">3. Electronics</a><a href="cg.html">4. CG Analysis</a>
+        <a href="gear.html">5. Landing Gear</a><a href="viewer.html">6. 3D Viewer</a>
+    </div>
+    <div class="grid"><div class="panel">
+        <label>AUW Weight (g)</label><input type="number" id="w" value="1200" oninput="upd()">
+        <label>Motor KV</label><input type="number" id="kv" value="1100" oninput="upd()">
+        <label>Voltage (V)</label><input type="number" id="v" value="14.8" oninput="upd()">
+        <label>Propeller Diameter (in)</label><input type="number" id="pd" value="9" oninput="upd()">
+        <label>Propeller Pitch (in)</label><input type="number" id="pp" value="6" oninput="upd()">
+    </div>
+    <div class="panel">
+        <canvas id="c_thrust"></canvas><canvas id="c_twr"></canvas>
+        <canvas id="c_amp"></canvas><canvas id="c_eff"></canvas>
+    </div></div>
+    <script>
+        let charts = {};
+        function draw(id, label, data, color) {
+            if(charts[id]) charts[id].destroy();
+            charts[id] = new Chart(document.getElementById(id), {
+                type: 'line', data: { labels: [0,10,20,30,40,50,60,70,80,90,100], 
+                datasets: [{ label: label, data: data, borderColor: color, tension: 0.4 }] },
+                options: { scales: { x: { title: { display: true, text: 'Throttle %' } } } }
+            });
+        }
+        function upd() {
+            let w = document.getElementById('w').value, v = document.getElementById('v').value;
+            let maxRpm = document.getElementById('kv').value * v;
+            let pD = document.getElementById('pd').value, pP = document.getElementById('pp').value;
+            let maxThrust = (Math.pow(pD,3)*pP*Math.pow(maxRpm,2)) / 2.5e7; // Empirical max
+            let maxPower = maxThrust * 0.25; // Approx W
+            let maxAmps = maxPower / v;
+            
+            let thrust=[], twr=[], amps=[], eff=[];
+            for(let t=0; t<=100; t+=10) {
+                let rpmFactor = t/100;
+                // Thrust scales exponentially with RPM squared (Throttle^2)
+                let th = maxThrust * Math.pow(rpmFactor, 2);
+                // Power/Amps scales with RPM cubed (Throttle^3)
+                let a = maxAmps * Math.pow(rpmFactor, 3);
+                
+                thrust.push(th); twr.push(th/w); amps.push(a);
+                eff.push(a > 0 ? (th/(a*v)) : 0);
+            }
+            draw('c_thrust', 'Thrust (g)', thrust, '#e74c3c');
+            draw('c_twr', 'Thrust-to-Weight Ratio', twr, '#2980b9');
+            draw('c_amp', 'Current (Amps)', amps, '#f39c12');
+            draw('c_eff', 'Efficiency (g/W)', eff, '#2ecc71');
+        } upd();
+    </script>
+</body></html>
