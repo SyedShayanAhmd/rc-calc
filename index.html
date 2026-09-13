@@ -13,15 +13,11 @@
             <label>Enter the desired aspect ratio:</label>
             <input type="number" id="ar" oninput="c()">
             
-            <label>Select the desired wing configuration:</label>
-            <select id="config" onchange="c()">
-                <option value="1.0">Rectangular</option>
-                <option value="0.6">Tapered</option>
-            </select>
+            <label>Enter Taper Ratio (1.0 = Rectangular):</label>
+            <input type="number" id="tr" step="0.05" oninput="c()">
         </div>
         <div class="panel">
             <h3>Geometry Outputs</h3>
-            <!-- Set to 2 columns to comfortably fit all 18 variables -->
             <div class="stat-grid" id="out" style="grid-template-columns: repeat(2, 1fr);"></div>
         </div>
     </div>
@@ -31,16 +27,15 @@
         document.getElementById('w').value = st.weight_g || 1500;
         document.getElementById('wcl').value = st.wingCubicLoading || 7;
         document.getElementById('ar').value = st.aspectRatio || 6;
-        document.getElementById('config').value = st.taperRatio || 1.0;
+        document.getElementById('tr').value = st.taperRatio || 1.0;
         
         function c() {
             const w_g = Number(document.getElementById('w').value);
             const wcl = Number(document.getElementById('wcl').value);
             const ar = Number(document.getElementById('ar').value);
-            const taperRatio = Number(document.getElementById('config').value);
+            const taperRatio = Number(document.getElementById('tr').value);
 
-            // 1. Math matching your exact spreadsheet reference ratios
-            const w_oz = w_g * 0.03527396195; // Exact conversion factor to match your screenshot
+            const w_oz = w_g * 0.03527396195;
             
             const area_sqft = Math.pow(w_oz / wcl, 2/3);
             const wing_area_sqin = area_sqft * 144;
@@ -68,7 +63,6 @@
             const elevator_length_in = hs_length_in;
             const elevator_width_in = hs_width_in * 0.35;
 
-            // 2. Render to UI (Outputting unrounded values to match your screenshot exactly)
             RCState.renderStats(document.getElementById('out'), {
                 'Wing Area (sq in)': wing_area_sqin,
                 'Wing Span (in)': wing_span_in,
@@ -90,7 +84,6 @@
                 'Elevator Width (in)': elevator_width_in
             });
 
-            // 3. Save Metric conversions to state so 3D viewer & CG keep working flawlessly
             const span_cm = wing_span_in * 2.54;
             const meanChord_cm = chord_in * 2.54;
             const rootChord_cm = (2 * meanChord_cm) / (1 + taperRatio);
