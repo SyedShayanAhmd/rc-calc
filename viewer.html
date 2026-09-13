@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html><head><link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script></head><body>
+    <div class="nav">
+        <a href="index.html">1. Sizer</a><a href="airfoil.html">2. Airfoil</a>
+        <a href="electronics.html">3. Electronics</a><a href="cg.html">4. CG Analysis</a>
+        <a href="gear.html">5. Landing Gear</a><a href="viewer.html" class="active">6. 3D Viewer</a>
+    </div>
+    <div class="panel">
+        <div id="3d-container" style="height: 500px; width: 100%;"></div>
+    </div>
+    <script>
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf4f7f6);
+        const camera = new THREE.PerspectiveCamera(75, 2, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({antialias: true});
+        renderer.setSize(document.getElementById('3d-container').clientWidth, 500);
+        document.getElementById('3d-container').appendChild(renderer.domElement);
+
+        const light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(5, 10, 5); scene.add(light);
+        scene.add(new THREE.AmbientLight(0x404040));
+
+        // Fuselage
+        const fuse = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 8), new THREE.MeshPhongMaterial({color: 0xcccccc}));
+        scene.add(fuse);
+        
+        // Wing
+        const wing = new THREE.Mesh(new THREE.BoxGeometry(10, 0.2, 1.5), new THREE.MeshPhongMaterial({color: 0x2980b9}));
+        wing.position.set(0, 0.6, -1); scene.add(wing);
+        
+        // Motor
+        const motor = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.5, 32), new THREE.MeshPhongMaterial({color: 0x222222}));
+        motor.rotation.x = Math.PI / 2; motor.position.set(0, 0, 4.25); scene.add(motor);
+
+        camera.position.set(8, 5, 8);
+        camera.lookAt(0,0,0);
+
+        function animate() { requestAnimationFrame(animate); scene.rotation.y += 0.005; renderer.render(scene, camera); }
+        animate();
+    </script>
+</body></html>
