@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>RC Sizing Suite — Get Started</title><link rel="stylesheet" href="style.css"></head><body>
+    <div class="suite-header">
+        <div class="suite-title"><span class="mark"></span>RC SIZING &amp; ANALYSIS SUITE</div>
+        <div class="suite-sub">CLIENT-SIDE · NO SERVER · LOCALSTORAGE STATE</div>
+    </div>
+    <div class="nav">
+        <a href="index.html"><span class="n">1</span>Sizer</a><a href="airfoil.html"><span class="n">2</span>Airfoil</a>
+        <a href="electronics.html"><span class="n">3</span>Electronics</a><a href="cg.html"><span class="n">4</span>CG Analysis</a>
+        <a href="gear.html"><span class="n">5</span>Landing Gear</a><a href="viewer.html"><span class="n">6</span>3D Viewer</a>
+        <a href="help.html" class="active"><span class="n">?</span>Get Started</a>
+    </div>
+
+    <div class="panel tick" style="margin-bottom:18px;">
+        <h3>Design Workflow</h3>
+        <p>The six modules are meant to be worked in sequence — each stage produces the numbers the next stage needs. All of it runs entirely in your browser: nothing is uploaded anywhere, and the working set of numbers is kept in <code>localStorage</code> so every tab reads the same aircraft.</p>
+        <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); margin-top:16px;">
+            <div class="panel raised">
+                <span class="badge">STEP 1</span>
+                <h3 style="border:none; padding:0; margin:10px 0 6px;">Size the Airframe</h3>
+                <p>Start in <b>Sizer</b>. Enter target weight, aspect ratio and wing cubic loading to get a first-pass wing area, span and chord. These feed every other module.</p>
+            </div>
+            <div class="panel raised">
+                <span class="badge">STEP 2</span>
+                <h3 style="border:none; padding:0; margin:10px 0 6px;">Select an Airfoil</h3>
+                <p>In <b>Airfoil</b>, pick a NACA 4-digit section (or Clark-Y) and check lift, drag, stall angle and aerodynamic-center estimates at your cruise condition.</p>
+            </div>
+            <div class="panel raised">
+                <span class="badge">STEP 3</span>
+                <h3 style="border:none; padding:0; margin:10px 0 6px;">Match the Powertrain</h3>
+                <p><b>Electronics</b> sizes motor/prop/battery against the all-up-weight (AUW) pulled from the Sizer, and estimates thrust-to-weight, current draw and flight time.</p>
+            </div>
+            <div class="panel raised">
+                <span class="badge">STEP 4</span>
+                <h3 style="border:none; padding:0; margin:10px 0 6px;">Balance the CG</h3>
+                <p><b>CG Analysis</b> sums component moments about the nose datum, plots CG against the wing's neutral point, and reports static margin.</p>
+            </div>
+            <div class="panel raised">
+                <span class="badge">STEP 5</span>
+                <h3 style="border:none; padding:0; margin:10px 0 6px;">Check the Gear</h3>
+                <p><b>Landing Gear</b> checks prop-strike clearance, tip-back (rotation) angle and lateral overturn angle against the CG height and position.</p>
+            </div>
+            <div class="panel raised">
+                <span class="badge">STEP 6</span>
+                <h3 style="border:none; padding:0; margin:10px 0 6px;">Review in 3D</h3>
+                <p>The <b>3D Viewer</b> renders a live, parametric model — wingspan, chord, fuselage length and CG marker all update from your saved state.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="panel">
+            <h3>How State Sync Works</h3>
+            <p>Every module reads/writes one shared object in <code>localStorage</code> (key <code>rcSizerSuite.v1</code>) via a small helper, <code>state.js</code>. When you change a value on one tab, it's saved immediately; open another tab and it reads the same value on load, and updates live if both tabs are open at once (via the browser's <code>storage</code> event).</p>
+            <p>Nothing here leaves your machine — there is no server component. Clearing your browser's site data resets the suite to its defaults.</p>
+        </div>
+        <div class="panel">
+            <h3>Reading the Citation Marks</h3>
+            <p>Small circular <span class="cite" data-note="Example: hovering or focusing a citation mark shows the formula's engineering source, e.g. a textbook, standard method, or empirical dataset.">i</span> marks sit next to formula outputs throughout the suite. Hover or focus one to see the engineering source for that number — a textbook (Raymer, Anderson, Abbott &amp; Von Doenhoff), a named method (Thin Airfoil Theory, Wing Cubic Loading), or an empirical dataset (UIUC Propeller Database).</p>
+            <p>Where a formula is a rule-of-thumb rather than a rigorous derivation, the note says so directly — treat those as first-pass estimates to validate against test data or higher-fidelity tools (XFOIL, AVL, or a wind-tunnel/whirl-rig test) before committing to hardware.</p>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h3>Reference Sources Used Throughout</h3>
+        <div class="stat-grid" style="grid-template-columns:1fr;">
+            <div class="stat-box" style="border-left-color:var(--teal);"><span class="stat-label">Raymer, D. — Aircraft Design: A Conceptual Approach</span><span class="stat-val" style="font-size:12.5px; font-weight:400;">Landing gear geometry (tip-back / overturn angle), general sizing conventions.</span></div>
+            <div class="stat-box" style="border-left-color:var(--teal);"><span class="stat-label">Abbott, I. &amp; Von Doenhoff, A. — Theory of Wing Sections</span><span class="stat-val" style="font-size:12.5px; font-weight:400;">NACA 4-digit camber-line geometry and thin-airfoil coefficients.</span></div>
+            <div class="stat-box" style="border-left-color:var(--teal);"><span class="stat-label">Anderson, J. — Fundamentals of Aerodynamics</span><span class="stat-val" style="font-size:12.5px; font-weight:400;">Thin airfoil theory (Glauert series), lifting-line induced drag.</span></div>
+            <div class="stat-box" style="border-left-color:var(--teal);"><span class="stat-label">UIUC Propeller Data Site (Selig, et al.)</span><span class="stat-val" style="font-size:12.5px; font-weight:400;">Real static/dynamic APC propeller test data for validating the hobby-grade thrust estimator.</span></div>
+            <div class="stat-box" style="border-left-color:var(--teal);"><span class="stat-label">Lennon, A. — Basics of R/C Model Aircraft Design</span><span class="stat-val" style="font-size:12.5px; font-weight:400;">Wing cubic loading method used in the Sizer.</span></div>
+        </div>
+    </div>
+</body></html>

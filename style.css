@@ -1,14 +1,142 @@
-body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f4f7f6; max-width: 1200px; margin: 0 auto; padding: 20px; color: #333; }
-.nav { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #ddd; padding-bottom: 10px; flex-wrap: wrap; }
-.nav a { text-decoration: none; padding: 8px 15px; background: #ddd; color: #333; border-radius: 4px; font-weight: bold; font-size: 14px;}
-.nav a.active { background: #2980b9; color: white; }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 20px; }
-.panel { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-input, select, button { width: 100%; padding: 8px; margin-top: 5px; margin-bottom: 15px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
-button { background: #27ae60; color: white; border: none; cursor: pointer; font-weight: bold; }
-canvas { width: 100%; background: #fafafa; border: 1px solid #ddd; border-radius: 4px; }
-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-.stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; font-size: 12px; }
-.stat-box { background: #e8f6f3; padding: 10px; border-radius: 4px; border-left: 3px solid #1abc9c; }
-.stat-box span { display: block; font-weight: bold; font-size: 16px; color: #2c3e50; }
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+/* ============================================================
+   DESIGN TOKENS
+   Aesthetic direction: instrument-panel / blueprint engineering
+   console, in the spirit of desktop CAD tools (NX, SOLIDWORKS)
+   and cockpit avionics displays rather than a generic SaaS UI.
+   ============================================================ */
+:root{
+  --void:        #0e1217;
+  --panel:       #161b22;
+  --panel-raised:#1c2330;
+  --grid-line:   #212a37;
+  --border:      #2b3547;
+  --border-strong:#3c4a60;
+  --text:        #e7ecf3;
+  --text-dim:    #93a2b8;
+  --text-faint:  #5b6980;
+  --accent:      #ff7a1a;   /* aerospace safety-orange: interactive / primary data */
+  --accent-soft: rgba(255,122,26,.14);
+  --teal:        #3ddbc4;   /* secondary data series */
+  --blue:        #5b9dd9;   /* tertiary data series */
+  --good:        #46d17a;
+  --warn:        #f2b84b;
+  --danger:      #ff6259;
+  --font-display:'Chakra Petch', sans-serif;
+  --font-body:   'IBM Plex Sans', sans-serif;
+  --font-mono:   'IBM Plex Mono', monospace;
+  --radius:      3px;
+}
+
+*{ box-sizing:border-box; }
+
+body{
+  font-family:var(--font-body);
+  background:
+    linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0/100% 28px,
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0/28px 100%,
+    var(--void);
+  background-attachment:fixed;
+  max-width:1280px;
+  margin:0 auto;
+  padding:22px 22px 60px;
+  color:var(--text);
+  font-size:14px;
+  line-height:1.5;
+}
+
+h1,h2,h3{ font-family:var(--font-display); font-weight:600; letter-spacing:.2px; margin:0 0 12px; color:var(--text); }
+h3{ font-size:15px; color:var(--text-dim); text-transform:uppercase; letter-spacing:1px; font-weight:600; border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:16px; }
+p{ margin:0 0 10px; color:var(--text-dim); }
+a{ color:var(--accent); }
+
+/* ---------- Top nav / module ribbon ---------- */
+.suite-header{ display:flex; align-items:baseline; justify-content:space-between; gap:16px; margin-bottom:14px; flex-wrap:wrap; }
+.suite-title{ font-family:var(--font-display); font-size:19px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:10px; }
+.suite-title .mark{ width:9px; height:9px; background:var(--accent); display:inline-block; transform:rotate(45deg); }
+.suite-sub{ font-family:var(--font-mono); font-size:11px; color:var(--text-faint); }
+
+.nav{ display:flex; gap:2px; margin-bottom:22px; background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:4px; flex-wrap:wrap; }
+.nav a{
+  text-decoration:none; padding:9px 14px; color:var(--text-dim); border-radius:2px;
+  font-family:var(--font-display); font-weight:600; font-size:12.5px; letter-spacing:.3px;
+  display:flex; align-items:center; gap:8px; transition:background .12s ease, color .12s ease;
+}
+.nav a .n{ font-family:var(--font-mono); font-size:10px; color:var(--text-faint); border:1px solid var(--border-strong); width:16px; height:16px; display:inline-flex; align-items:center; justify-content:center; border-radius:50%; }
+.nav a:hover{ background:var(--panel-raised); color:var(--text); }
+.nav a.active{ background:var(--accent); color:#191007; }
+.nav a.active .n{ border-color:#191007; color:#191007; }
+
+/* ---------- Layout ---------- */
+.grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:18px; margin-bottom:18px; }
+.panel{
+  background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+  padding:20px; position:relative;
+}
+.panel.raised{ background:var(--panel-raised); }
+.panel::before{ /* corner tick — used sparingly as a device on hero/viewer panels */
+  content:''; position:absolute; top:0; left:0; width:10px; height:10px;
+  border-top:2px solid var(--border-strong); border-left:2px solid var(--border-strong);
+}
+.panel.tick::before{ border-color:var(--accent); }
+
+/* ---------- Form controls ---------- */
+label{ display:block; font-family:var(--font-mono); font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:.6px; margin-bottom:6px; margin-top:14px; }
+label:first-of-type{ margin-top:0; }
+input, select, button, textarea{
+  width:100%; padding:9px 10px; margin-top:0; margin-bottom:0;
+  box-sizing:border-box; background:var(--void); border:1px solid var(--border-strong);
+  border-radius:2px; color:var(--text); font-family:var(--font-mono); font-size:13px;
+}
+input:focus, select:focus, button:focus, textarea:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+select{ font-family:var(--font-body); }
+button{
+  background:var(--accent); color:#191007; border:none; cursor:pointer;
+  font-family:var(--font-display); font-weight:700; font-size:12.5px; letter-spacing:.4px;
+  padding:10px 14px; margin-top:14px; text-transform:uppercase;
+}
+button:hover{ background:#ff8b38; }
+button.ghost{ background:transparent; border:1px solid var(--border-strong); color:var(--text-dim); }
+button.ghost:hover{ background:var(--panel-raised); color:var(--text); }
+button.danger-btn{ background:var(--danger); color:#2a0806; }
+
+canvas{ width:100%; background:var(--void); border:1px solid var(--border); border-radius:2px; }
+
+table{ width:100%; border-collapse:collapse; margin-top:6px; font-family:var(--font-mono); font-size:12.5px; }
+th, td{ border:1px solid var(--border); padding:8px; text-align:left; }
+th{ background:var(--panel-raised); font-family:var(--font-body); text-transform:uppercase; font-size:10.5px; letter-spacing:.6px; color:var(--text-faint); }
+td input{ margin:0; padding:6px 8px; font-size:12.5px; }
+
+/* ---------- Stat readouts ---------- */
+.stat-grid{ display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; }
+.stat-box{ background:var(--panel-raised); padding:10px 12px; border-radius:2px; border-left:2px solid var(--accent); }
+.stat-label{ display:flex; align-items:center; gap:0; font-family:var(--font-mono); font-size:10px; color:var(--text-faint); text-transform:uppercase; letter-spacing:.5px; }
+.stat-val{ display:block; font-family:var(--font-mono); font-weight:600; font-size:16px; color:var(--text); margin-top:4px; }
+.stat-val.good{ color:var(--good); } .stat-val.warn{ color:var(--warn); } .stat-val.danger{ color:var(--danger); }
+@media (max-width:760px){ .stat-grid{ grid-template-columns:repeat(2,1fr); } }
+
+/* ---------- Citation tooltip ---------- */
+.cite{
+  display:inline-flex; align-items:center; justify-content:center; width:13px; height:13px;
+  border-radius:50%; background:var(--border-strong); color:var(--text-dim);
+  font-size:9px; font-family:var(--font-mono); cursor:help; margin-left:5px; position:relative;
+}
+.cite:hover, .cite:focus{ background:var(--accent); color:#191007; }
+.cite::after{
+  content:attr(data-note); position:absolute; bottom:135%; left:50%; transform:translateX(-50%);
+  width:230px; background:var(--panel-raised); color:var(--text); border:1px solid var(--border-strong);
+  border-radius:3px; padding:9px 11px; font-size:11px; font-family:var(--font-body); font-weight:400;
+  text-transform:none; letter-spacing:normal; line-height:1.45; opacity:0; pointer-events:none;
+  transition:opacity .12s ease; box-shadow:0 6px 20px rgba(0,0,0,.45); z-index:80; text-align:left;
+}
+.cite:hover::after, .cite:focus::after{ opacity:1; }
+
+.note{ font-family:var(--font-mono); font-size:11px; color:var(--text-faint); background:var(--panel-raised); border-left:2px solid var(--border-strong); padding:8px 10px; border-radius:2px; }
+.badge{ display:inline-block; font-family:var(--font-mono); font-size:10px; padding:2px 7px; border-radius:2px; border:1px solid var(--border-strong); color:var(--text-dim); }
+.badge.good{ border-color:var(--good); color:var(--good); }
+.badge.warn{ border-color:var(--warn); color:var(--warn); }
+.badge.danger{ border-color:var(--danger); color:var(--danger); }
+
+.sync-flag{ font-family:var(--font-mono); font-size:10.5px; color:var(--teal); display:flex; align-items:center; gap:6px; margin-bottom:14px; }
+.sync-flag .dot{ width:6px; height:6px; border-radius:50%; background:var(--teal); box-shadow:0 0 6px var(--teal); }

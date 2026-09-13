@@ -1,36 +1,72 @@
 <!DOCTYPE html>
-<html><head><link rel="stylesheet" href="style.css"></head><body>
-    <div class="nav">
-        <a href="index.html" class="active">1. Sizer</a><a href="airfoil.html">2. Airfoil</a>
-        <a href="electronics.html">3. Electronics</a><a href="cg.html">4. CG Analysis</a>
-        <a href="gear.html">5. Landing Gear</a><a href="viewer.html">6. 3D Viewer</a>
+<html><head><meta charset="UTF-8"><title>RC Sizing Suite — 1. Sizer</title><link rel="stylesheet" href="style.css"></head><body>
+    <div class="suite-header">
+        <div class="suite-title"><span class="mark"></span>RC SIZING &amp; ANALYSIS SUITE</div>
+        <div class="suite-sub">CLIENT-SIDE · NO SERVER · LOCALSTORAGE STATE</div>
     </div>
+    <div class="nav">
+        <a href="index.html" class="active"><span class="n">1</span>Sizer</a><a href="airfoil.html"><span class="n">2</span>Airfoil</a>
+        <a href="electronics.html"><span class="n">3</span>Electronics</a><a href="cg.html"><span class="n">4</span>CG Analysis</a>
+        <a href="gear.html"><span class="n">5</span>Landing Gear</a><a href="viewer.html"><span class="n">6</span>3D Viewer</a>
+        <a href="help.html"><span class="n">?</span>Get Started</a>
+    </div>
+
     <div class="grid"><div class="panel">
         <h3>Inputs</h3>
         <label>Weight (g)</label><input type="number" id="w" value="1500" oninput="c()">
         <label>Aspect Ratio</label><input type="number" id="ar" value="6" oninput="c()">
-        <label>Wing Cubic Loading</label><input type="number" id="wcl" value="7" oninput="c()">
-        <label>Taper Ratio</label><input type="number" id="tr" value="0.6" oninput="c()">
+        <label>Wing Cubic Loading (oz/ft³)</label><input type="number" id="wcl" value="7" oninput="c()">
+        <label>Taper Ratio</label><input type="number" id="tr" value="0.6" step="0.05" oninput="c()">
     </div>
     <div class="panel">
-        <h3>Geometry</h3>
-        <div class="stat-grid">
-            <div class="stat-box">Area (dm²)<span id="o_a"></span></div>
-            <div class="stat-box">Span (cm)<span id="o_s"></span></div>
-            <div class="stat-box">Root Chord (cm)<span id="o_r"></span></div>
-            <div class="stat-box">Tip Chord (cm)<span id="o_t"></span></div>
-        </div>
+        <h3>Geometry <span class="cite" tabindex="0" data-note="Andy Lennon, Basics of R/C Model Aircraft Design — Wing Cubic Loading (WCL) method. WCL relates flying weight to wing area via an empirical sport-aircraft density term rather than a first-principles lift equation; treat results as a first-pass starting point.">i</span></h3>
+        <div class="stat-grid" id="out"></div>
     </div></div>
+
+    <div class="panel">
+        <p class="note">Area is derived from Wing Cubic Loading (an empirical RC sport-aircraft sizing method), not a direct lift/stall-speed calculation. Span, root and tip chord follow from Aspect Ratio and Taper Ratio using standard planform relations (Raymer, Ch. 4).</p>
+    </div>
+
+    <script src="state.js"></script>
     <script>
+        // Load any previously saved state so this tab reflects the shared aircraft.
+        const st = RCState.get();
+        document.getElementById('w').value  = st.weight_g;
+        document.getElementById('ar').value = st.aspectRatio;
+        document.getElementById('wcl').value= st.wingCubicLoading;
+        document.getElementById('tr').value = st.taperRatio;
+
         function c() {
-            let w = document.getElementById('w').value/1000, ar = document.getElementById('ar').value, wcl = document.getElementById('wcl').value, tr = document.getElementById('tr').value;
-            let area_dm = Math.pow((w*1000/wcl), 2/3);
-            let span_cm = Math.sqrt(ar * area_dm) * 10;
-            let chord = (area_dm*100) / span_cm;
-            document.getElementById('o_a').innerText = area_dm.toFixed(1);
-            document.getElementById('o_s').innerText = span_cm.toFixed(1);
-            document.getElementById('o_r').innerText = ((2*chord)/(1+Number(tr))).toFixed(1);
-            document.getElementById('o_t').innerText = (((2*chord)/(1+Number(tr)))*tr).toFixed(1);
+            const w   = Number(document.getElementById('w').value);   // g
+            const ar  = Number(document.getElementById('ar').value);  // dimensionless
+            const wcl = Number(document.getElementById('wcl').value); // oz/ft^3 (empirical)
+            const tr  = Number(document.getElementById('tr').value);  // tip/root chord ratio
+
+            // --- Wing Cubic Loading method (Lennon) ---
+            // Area (dm^2) = ( Weight(g) / WCL )^(2/3)   [empirical sport-model correlation]
+            const area_dm2 = Math.pow(w / wcl, 2 / 3);
+
+            // --- Standard planform relations (Raymer, Ch.4) ---
+            // Aspect Ratio AR = b^2 / S  =>  b = sqrt(AR * S)
+            const span_cm = Math.sqrt(ar * area_dm2) * 10;              // dm -> cm (x10)
+            const meanChord_cm = (area_dm2 * 100) / span_cm;            // mean geometric chord
+            // Taper ratio λ = c_tip / c_root ; mean chord relation for a trapezoidal
+            // planform: c_root = 2*c_mean / (1+λ),  c_tip = λ * c_root
+            const rootChord_cm = (2 * meanChord_cm) / (1 + tr);
+            const tipChord_cm  = rootChord_cm * tr;
+
+            RCState.renderStats(document.getElementById('out'), {
+                'Area': { value: area_dm2.toFixed(1) + ' dm²', note: 'S = (Weight / Wing Cubic Loading)^(2/3) — Lennon, Basics of R/C Model Aircraft Design.' },
+                'Span': { value: span_cm.toFixed(1) + ' cm', note: 'b = √(AR · S) — definition of Aspect Ratio, Raymer Ch.4.' },
+                'Root Chord': { value: rootChord_cm.toFixed(1) + ' cm', note: 'c_root = 2·c_mean / (1+λ) for a linear-taper trapezoidal planform.' },
+                'Tip Chord': { value: tipChord_cm.toFixed(1) + ' cm', note: 'c_tip = λ · c_root, λ = taper ratio.' }
+            });
+
+            // Persist the derived geometry so Airfoil, CG and the 3D Viewer can read it.
+            RCState.set({
+                weight_g: w, aspectRatio: ar, wingCubicLoading: wcl, taperRatio: tr,
+                area_dm2, span_cm, rootChord_cm, tipChord_cm, meanChord_cm
+            });
         }
         c();
     </script>

@@ -1,54 +1,123 @@
 <!DOCTYPE html>
-<html><head><link rel="stylesheet" href="style.css"><script src="https://cdn.jsdelivr.net/npm/chart.js"></script></head><body>
-    <div class="nav">
-        <a href="index.html">1. Sizer</a><a href="airfoil.html">2. Airfoil</a>
-        <a href="electronics.html" class="active">3. Electronics</a><a href="cg.html">4. CG Analysis</a>
-        <a href="gear.html">5. Landing Gear</a><a href="viewer.html">6. 3D Viewer</a>
+<html><head><meta charset="UTF-8"><title>RC Sizing Suite — 3. Electronics</title><link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script></head><body>
+    <div class="suite-header">
+        <div class="suite-title"><span class="mark"></span>RC SIZING &amp; ANALYSIS SUITE</div>
+        <div class="suite-sub">CLIENT-SIDE · NO SERVER · LOCALSTORAGE STATE</div>
     </div>
+    <div class="nav">
+        <a href="index.html"><span class="n">1</span>Sizer</a><a href="airfoil.html"><span class="n">2</span>Airfoil</a>
+        <a href="electronics.html" class="active"><span class="n">3</span>Electronics</a><a href="cg.html"><span class="n">4</span>CG Analysis</a>
+        <a href="gear.html"><span class="n">5</span>Landing Gear</a><a href="viewer.html"><span class="n">6</span>3D Viewer</a>
+        <a href="help.html"><span class="n">?</span>Get Started</a>
+    </div>
+
+    <div class="sync-flag"><span class="dot"></span>AUW is pulled from the Sizer's weight input — change it there to update every module.</div>
+
     <div class="grid"><div class="panel">
+        <h3>Powertrain Inputs</h3>
         <label>AUW Weight (g)</label><input type="number" id="w" value="1200" oninput="upd()">
         <label>Motor KV</label><input type="number" id="kv" value="1100" oninput="upd()">
         <label>Voltage (V)</label><input type="number" id="v" value="14.8" oninput="upd()">
         <label>Propeller Diameter (in)</label><input type="number" id="pd" value="9" oninput="upd()">
         <label>Propeller Pitch (in)</label><input type="number" id="pp" value="6" oninput="upd()">
+        <label>Battery Capacity (mAh)</label><input type="number" id="cap" value="2200" oninput="upd()">
+        <label>Cruise Throttle (%)</label><input type="number" id="cruise" value="50" min="1" max="100" oninput="upd()">
+        <div class="stat-grid" id="flightStats" style="margin-top:16px;"></div>
     </div>
     <div class="panel">
+        <h3>Performance vs Throttle <span class="cite" tabindex="0" data-note="Static thrust here uses a simplified hobby-grade empirical scaling (T ∝ D³·P·RPM²), calibrated loosely against typical APC-style propeller behavior. It is NOT a substitute for real test data. For rigorous numbers, pull the matching prop's measured curve from the UIUC Propeller Data Site (Selig et al.) or APC's published performance data.">i</span></h3>
         <canvas id="c_thrust"></canvas><canvas id="c_twr"></canvas>
         <canvas id="c_amp"></canvas><canvas id="c_eff"></canvas>
     </div></div>
+
+    <script src="state.js"></script>
     <script>
+        const st = RCState.get();
+        document.getElementById('w').value = st.weight_g || 1200;
+        document.getElementById('kv').value = st.motorKV;
+        document.getElementById('v').value = st.voltageV;
+        document.getElementById('pd').value = st.propDia_in;
+        document.getElementById('pp').value = st.propPitch_in;
+        document.getElementById('cap').value = st.battCapacity_mAh;
+        document.getElementById('cruise').value = st.cruiseThrottlePct;
+
         let charts = {};
         function draw(id, label, data, color) {
-            if(charts[id]) charts[id].destroy();
+            if (charts[id]) charts[id].destroy();
             charts[id] = new Chart(document.getElementById(id), {
-                type: 'line', data: { labels: [0,10,20,30,40,50,60,70,80,90,100], 
-                datasets: [{ label: label, data: data, borderColor: color, tension: 0.4 }] },
-                options: { scales: { x: { title: { display: true, text: 'Throttle %' } } } }
+                type: 'line',
+                data: { labels: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+                    datasets: [{ label: label, data: data, borderColor: color, backgroundColor: color + '22', tension: 0.4, fill: true }] },
+                options: {
+                    scales: {
+                        x: { title: { display: true, text: 'Throttle %', color: '#93a2b8' }, ticks: { color: '#93a2b8' }, grid: { color: '#212a37' } },
+                        y: { ticks: { color: '#93a2b8' }, grid: { color: '#212a37' } }
+                    },
+                    plugins: { legend: { labels: { color: '#e7ecf3' } } }
+                }
             });
         }
+
         function upd() {
-            let w = document.getElementById('w').value, v = document.getElementById('v').value;
-            let maxRpm = document.getElementById('kv').value * v;
-            let pD = document.getElementById('pd').value, pP = document.getElementById('pp').value;
-            let maxThrust = (Math.pow(pD,3)*pP*Math.pow(maxRpm,2)) / 2.5e7; // Empirical max
-            let maxPower = maxThrust * 0.25; // Approx W
-            let maxAmps = maxPower / v;
-            
-            let thrust=[], twr=[], amps=[], eff=[];
-            for(let t=0; t<=100; t+=10) {
-                let rpmFactor = t/100;
-                // Thrust scales exponentially with RPM squared (Throttle^2)
-                let th = maxThrust * Math.pow(rpmFactor, 2);
-                // Power/Amps scales with RPM cubed (Throttle^3)
-                let a = maxAmps * Math.pow(rpmFactor, 3);
-                
-                thrust.push(th); twr.push(th/w); amps.push(a);
-                eff.push(a > 0 ? (th/(a*v)) : 0);
+            const w = Number(document.getElementById('w').value);
+            const v = Number(document.getElementById('v').value);
+            const kv = Number(document.getElementById('kv').value);
+            const pD = Number(document.getElementById('pd').value);
+            const pP = Number(document.getElementById('pp').value);
+            const cap = Number(document.getElementById('cap').value);
+            const cruisePct = Number(document.getElementById('cruise').value);
+
+            // No-load max RPM: RPM_max = KV * V   (brushless motor constant, standard definition)
+            const maxRpm = kv * v;
+
+            // --- Static thrust: simplified empirical hobby-grade scaling ---
+            // T ∝ D^3 · P · RPM^2, coefficient calibrated to typical small
+            // electric RC props (rough order-of-magnitude match to APC static
+            // test data). This is a FIRST-PASS ESTIMATE, not a substitute for
+            // measured or UIUC/APC-published propeller performance curves.
+            const maxThrust_g = (Math.pow(pD, 3) * pP * Math.pow(maxRpm, 2)) / 2.5e7;
+            // Shaft power draw approximated as a fraction of thrust*RPM scaling
+            const maxPower_W = maxThrust_g * 0.25;
+            const maxAmps = maxPower_W / v;
+
+            let thrust = [], twr = [], amps = [], eff = [];
+            for (let t = 0; t <= 100; t += 10) {
+                const rpmFactor = t / 100;
+                // Thrust scales with RPM^2 (momentum-theory scaling, T ~ n^2 D^4 Ct)
+                const th = maxThrust_g * Math.pow(rpmFactor, 2);
+                // Electrical power/current scales ~RPM^3 (propeller power coefficient
+                // scaling, P ~ n^3 D^5 Cp) — standard propeller affinity laws.
+                const a = maxAmps * Math.pow(rpmFactor, 3);
+                thrust.push(th); twr.push(th / w); amps.push(a);
+                eff.push(a > 0 ? (th / (a * v)) : 0);
             }
-            draw('c_thrust', 'Thrust (g)', thrust, '#e74c3c');
-            draw('c_twr', 'Thrust-to-Weight Ratio', twr, '#2980b9');
-            draw('c_amp', 'Current (Amps)', amps, '#f39c12');
-            draw('c_eff', 'Efficiency (g/W)', eff, '#2ecc71');
-        } upd();
+            draw('c_thrust', 'Thrust (g)', thrust, '#ff7a1a');
+            draw('c_twr', 'Thrust-to-Weight Ratio', twr, '#5b9dd9');
+            draw('c_amp', 'Current (Amps)', amps, '#f2b84b');
+            draw('c_eff', 'Efficiency (g/W)', eff, '#46d17a');
+
+            // --- Battery flight-time estimate ---
+            // Avg current at the chosen cruise throttle, from the affinity-law curve above.
+            const cruiseAmps = maxAmps * Math.pow(cruisePct / 100, 3);
+            // Usable capacity fraction: common LiPo-care guideline is to discharge
+            // to ~20% remaining (not fully flat) to preserve cell cycle life.
+            const usableFraction = 0.8;
+            const flightTime_min = cruiseAmps > 0
+                ? ((cap / 1000) * usableFraction) / cruiseAmps * 60
+                : 0;
+            const twrStatic = maxThrust_g / w;
+
+            RCState.renderStats(document.getElementById('flightStats'), {
+                'Max RPM': { value: maxRpm.toFixed(0), note: 'RPM_max = KV × V (brushless motor constant definition, no-load).' },
+                'Static Thrust': maxThrust_g.toFixed(0) + ' g',
+                'Static T/W': { value: twrStatic.toFixed(2), cls: twrStatic >= 1 ? 'good' : twrStatic >= 0.5 ? 'warn' : 'danger', note: 'T/W ≥ ~0.5 is typical for sport flight; ≥1.0 gives vertical/3D performance.' },
+                'Max Current': maxAmps.toFixed(1) + ' A',
+                'Est. Flight Time': { value: flightTime_min.toFixed(1) + ' min', note: `Flight time = (Capacity × 80% usable) / Cruise Current × 60. Usable-capacity guideline protects LiPo cycle life. Cruise current here is the modeled current at ${cruisePct}% throttle.` }
+            });
+
+            RCState.set({ weight_g: w, motorKV: kv, voltageV: v, propDia_in: pD, propPitch_in: pP, battCapacity_mAh: cap, cruiseThrottlePct: cruisePct });
+        }
+        upd();
     </script>
 </body></html>

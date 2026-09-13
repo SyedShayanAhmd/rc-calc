@@ -1,38 +1,137 @@
 <!DOCTYPE html>
-<html><head><link rel="stylesheet" href="style.css"></head><body>
-    <div class="nav">
-        <a href="index.html">1. Sizer</a><a href="airfoil.html">2. Airfoil</a>
-        <a href="electronics.html">3. Electronics</a><a href="cg.html" class="active">4. CG Analysis</a>
-        <a href="gear.html">5. Landing Gear</a><a href="viewer.html">6. 3D Viewer</a>
+<html><head><meta charset="UTF-8"><title>RC Sizing Suite — 4. CG Analysis</title><link rel="stylesheet" href="style.css"></head><body>
+    <div class="suite-header">
+        <div class="suite-title"><span class="mark"></span>RC SIZING &amp; ANALYSIS SUITE</div>
+        <div class="suite-sub">CLIENT-SIDE · NO SERVER · LOCALSTORAGE STATE</div>
     </div>
-    <div class="panel">
-        <p><i>Note: Set Datum (0 mm) at the absolute tip of the nose.</i></p>
-        <table id="cgTbl">
-            <tr><th>Component</th><th>Weight (g)</th><th>Distance from Nose (mm)</th><th>Moment (g·mm)</th><th>X</th></tr>
-        </table>
-        <button onclick="add()" style="margin-top:10px;">+ Add Component</button>
-        <div class="stat-grid" style="margin-top:20px;">
-            <div class="stat-box">Total Weight<span id="tw">0 g</span></div>
-            <div class="stat-box">Total Moment<span id="tm">0</span></div>
-            <div class="stat-box">CG Position<span id="cg">0 mm</span></div>
+    <div class="nav">
+        <a href="index.html"><span class="n">1</span>Sizer</a><a href="airfoil.html"><span class="n">2</span>Airfoil</a>
+        <a href="electronics.html"><span class="n">3</span>Electronics</a><a href="cg.html" class="active"><span class="n">4</span>CG Analysis</a>
+        <a href="gear.html"><span class="n">5</span>Landing Gear</a><a href="viewer.html"><span class="n">6</span>3D Viewer</a>
+        <a href="help.html"><span class="n">?</span>Get Started</a>
+    </div>
+
+    <div class="sync-flag"><span class="dot"></span>Root/tip chord come from the Sizer. CG position here feeds the Viewer's CG marker.</div>
+
+    <div class="grid" style="grid-template-columns:1fr 1fr;">
+        <div class="panel">
+            <h3>Component Weights &amp; Moments</h3>
+            <p><i>Datum (0 mm) is set at the absolute tip of the nose.</i></p>
+            <table id="cgTbl">
+                <tr><th>Component</th><th>Weight (g)</th><th>Dist. from Nose (mm)</th><th>Moment (g·mm)</th><th></th></tr>
+            </table>
+            <button onclick="add()">+ Add Component</button>
+            <div class="stat-grid" style="margin-top:16px;">
+                <div class="stat-box"><span class="stat-label">Total Weight</span><span class="stat-val" id="tw">0 g</span></div>
+                <div class="stat-box"><span class="stat-label">Total Moment</span><span class="stat-val" id="tm">0</span></div>
+                <div class="stat-box"><span class="stat-label">CG Position</span><span class="stat-val" id="cg">0 mm</span></div>
+            </div>
+        </div>
+        <div class="panel">
+            <h3>Stability Reference <span class="cite" tabindex="0" data-note="Neutral Point estimated here as the wing's own quarter-MAC point (unswept-wing assumption, no horizontal tail modeled). A real tail moves the NP aft. Treat this as a conservative, forward-biased target — keep your actual CG ahead of it.">i</span></h3>
+            <label>Wing Leading-Edge Position from Nose (mm)</label><input type="number" id="wingLE" value="300" oninput="draw()">
+            <label>Fuselage Length (mm)</label><input type="number" id="fuseLen" value="900" oninput="draw()">
+            <div class="stat-grid" id="stabStats" style="margin-top:10px;"></div>
+            <canvas id="cgPlot" width="760" height="170" style="margin-top:16px;"></canvas>
         </div>
     </div>
+
+    <script src="state.js"></script>
     <script>
-        let comps = [{n:"Motor",w:100,d:10}, {n:"Battery",w:250,d:150}, {n:"Wing",w:400,d:300}];
-        function draw() {
-            let t = document.getElementById('cgTbl'), tw=0, tm=0;
-            while(t.rows.length > 1) t.deleteRow(1);
+        const st = RCState.get();
+        let comps = (st.components && st.components.length) ? st.components : [
+            { n: 'Motor', w: 100, d: 10 }, { n: 'Battery', w: 250, d: 150 }, { n: 'Wing (LE)', w: 400, d: 300 }
+        ];
+        document.getElementById('wingLE').value = st.wingLEPosition_mm || 300;
+        document.getElementById('fuseLen').value = st.fuselageLength_mm || 900;
+
+        function tableRows() {
+            const t = document.getElementById('cgTbl');
+            while (t.rows.length > 1) t.deleteRow(1);
+            let tw = 0, tm = 0;
             comps.forEach((c, i) => {
-                let m = c.w * c.d; tw+=c.w; tm+=m;
-                t.innerHTML += `<tr><td><input value="${c.n}" oninput="comps[${i}].n=this.value"></td>
+                const m = c.w * c.d; tw += c.w; tm += m;
+                const row = t.insertRow(-1);
+                row.innerHTML = `<td><input value="${c.n}" oninput="comps[${i}].n=this.value"></td>
                 <td><input type="number" value="${c.w}" oninput="comps[${i}].w=Number(this.value); draw()"></td>
                 <td><input type="number" value="${c.d}" oninput="comps[${i}].d=Number(this.value); draw()"></td>
-                <td>${m}</td><td><button onclick="comps.splice(${i},1); draw()">X</button></td></tr>`;
+                <td>${m}</td><td><button class="danger-btn" style="margin:0;" onclick="comps.splice(${i},1); draw()">×</button></td>`;
             });
-            document.getElementById('tw').innerText = tw + " g";
-            document.getElementById('tm').innerText = tm;
-            document.getElementById('cg').innerText = tw>0 ? (tm/tw).toFixed(1) + " mm" : "0 mm";
+            return { tw, tm };
         }
-        function add() { comps.push({n:"New",w:0,d:0}); draw(); } draw();
+
+        function draw() {
+            const { tw, tm } = tableRows();
+            const cgPos = tw > 0 ? tm / tw : 0;
+            document.getElementById('tw').innerText = tw + ' g';
+            document.getElementById('tm').innerText = tm;
+            document.getElementById('cg').innerText = cgPos.toFixed(1) + ' mm';
+
+            // --- Mean Aerodynamic Chord (MAC), standard trapezoidal-wing formula ---
+            // MAC = (2/3) * c_root * (1 + lambda + lambda^2) / (1 + lambda),  lambda = c_tip/c_root
+            const liveState = RCState.get();
+            const rootChord_mm = (liveState.rootChord_cm || 25.4) * 10;
+            const tipChord_mm = (liveState.tipChord_cm || 15.3) * 10;
+            const lambda = rootChord_mm > 0 ? tipChord_mm / rootChord_mm : 1;
+            const mac_mm = (2 / 3) * rootChord_mm * (1 + lambda + lambda * lambda) / (1 + lambda);
+
+            const wingLE = Number(document.getElementById('wingLE').value);
+            const fuseLen = Number(document.getElementById('fuseLen').value);
+
+            // Neutral point: quarter-MAC point, measured from the wing's own
+            // leading edge (unswept-wing simplification — no fuselage/tail
+            // contribution modeled). This is a widely used RC-hobby rule of
+            // thumb (target CG at/ahead of ~25% MAC) rather than a full VLM result.
+            const np_mm = wingLE + 0.25 * mac_mm;
+            const staticMargin = mac_mm > 0 ? ((np_mm - cgPos) / mac_mm) * 100 : 0;
+
+            RCState.renderStats(document.getElementById('stabStats'), {
+                'MAC': { value: mac_mm.toFixed(1) + ' mm', note: 'MAC = (2/3)·c_root·(1+λ+λ²)/(1+λ) — standard trapezoidal wing formula (Raymer Ch.4). λ = c_tip/c_root from the Sizer.' },
+                'Neutral Point': { value: np_mm.toFixed(1) + ' mm', note: 'NP ≈ Wing LE + 25% MAC (wing-only quarter-chord a.c., thin airfoil theory). A stabilizing tail shifts the true NP aft of this.' },
+                'Static Margin': {
+                    value: staticMargin.toFixed(1) + '%',
+                    cls: staticMargin >= 5 && staticMargin <= 15 ? 'good' : (staticMargin < 0 ? 'danger' : 'warn'),
+                    note: 'SM = (NP − CG) / MAC × 100. Typical sport-model target: ~5–15% (positive = stable, CG ahead of NP). Below 0% is statically unstable.'
+                }
+            });
+
+            RCState.set({ components: comps, wingLEPosition_mm: wingLE, fuselageLength_mm: fuseLen, cgPosition_mm: cgPos, macLength_mm: mac_mm, neutralPoint_mm: np_mm, staticMargin_pct: staticMargin });
+
+            // --- Canvas plot: nose datum, CG, NP, wing chord span ---
+            const ctx = document.getElementById('cgPlot').getContext('2d');
+            const W = 760, H = 170, padL = 20, padR = 20, axisY = 90;
+            ctx.clearRect(0, 0, W, H);
+            const scale = (W - padL - padR) / Math.max(fuseLen, 1);
+            const toPx = (mm) => padL + mm * scale;
+
+            // fuselage reference line
+            ctx.strokeStyle = '#3c4a60'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(toPx(0), axisY); ctx.lineTo(toPx(fuseLen), axisY); ctx.stroke();
+
+            // tick marks every 100mm
+            ctx.fillStyle = '#5b6980'; ctx.font = '9px IBM Plex Mono'; ctx.textAlign = 'center';
+            for (let mm = 0; mm <= fuseLen; mm += 100) {
+                ctx.beginPath(); ctx.moveTo(toPx(mm), axisY - 4); ctx.lineTo(toPx(mm), axisY + 4); ctx.strokeStyle = '#2b3547'; ctx.stroke();
+                ctx.fillText(mm, toPx(mm), axisY + 16);
+            }
+
+            // wing chord span (root chord as a bar under the LE point, simplified)
+            ctx.fillStyle = 'rgba(93,157,217,.25)'; ctx.strokeStyle = '#5b9dd9';
+            ctx.fillRect(toPx(wingLE), axisY - 30, rootChord_mm * scale, 10);
+            ctx.strokeRect(toPx(wingLE), axisY - 30, rootChord_mm * scale, 10);
+            ctx.fillStyle = '#5b9dd9'; ctx.fillText('WING (root chord)', toPx(wingLE + rootChord_mm / 2), axisY - 36);
+
+            function marker(mm, color, label, dy) {
+                const x = toPx(mm);
+                ctx.beginPath(); ctx.moveTo(x, axisY - 8); ctx.lineTo(x - 6, axisY + 8); ctx.lineTo(x + 6, axisY + 8); ctx.closePath();
+                ctx.fillStyle = color; ctx.fill();
+                ctx.fillStyle = color; ctx.fillText(label, x, axisY + dy);
+            }
+            marker(0, '#93a2b8', 'NOSE', 46);
+            marker(np_mm, '#3ddbc4', 'NP', 62);
+            marker(cgPos, '#ff7a1a', 'CG', 78);
+        }
+        function add() { comps.push({ n: 'New', w: 0, d: 0 }); draw(); }
+        draw();
     </script>
 </body></html>

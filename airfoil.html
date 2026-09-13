@@ -1,58 +1,184 @@
 <!DOCTYPE html>
-<html><head><link rel="stylesheet" href="style.css"></head><body>
-    <div class="nav">
-        <a href="index.html">1. Sizer</a><a href="airfoil.html" class="active">2. Airfoil</a>
-        <a href="electronics.html">3. Electronics</a><a href="cg.html">4. CG Analysis</a>
-        <a href="gear.html">5. Landing Gear</a><a href="viewer.html">6. 3D Viewer</a>
+<html><head><meta charset="UTF-8"><title>RC Sizing Suite — 2. Airfoil</title><link rel="stylesheet" href="style.css"></head><body>
+    <div class="suite-header">
+        <div class="suite-title"><span class="mark"></span>RC SIZING &amp; ANALYSIS SUITE</div>
+        <div class="suite-sub">CLIENT-SIDE · NO SERVER · LOCALSTORAGE STATE</div>
     </div>
+    <div class="nav">
+        <a href="index.html"><span class="n">1</span>Sizer</a><a href="airfoil.html" class="active"><span class="n">2</span>Airfoil</a>
+        <a href="electronics.html"><span class="n">3</span>Electronics</a><a href="cg.html"><span class="n">4</span>CG Analysis</a>
+        <a href="gear.html"><span class="n">5</span>Landing Gear</a><a href="viewer.html"><span class="n">6</span>3D Viewer</a>
+        <a href="help.html"><span class="n">?</span>Get Started</a>
+    </div>
+
+    <div class="sync-flag"><span class="dot"></span>Chord defaults from Sizer wing geometry — edit freely, it will not write back to the Sizer.</div>
+
     <div class="grid"><div class="panel">
-        <label>Profile (e.g. 2412, 0012, clarky)</label><input type="text" id="naca" value="2412" oninput="calc()">
+        <h3>Section &amp; Condition</h3>
+        <label>Profile (NACA 4-digit, e.g. 2412, 0012, or "clarky")</label><input type="text" id="naca" value="2412" oninput="calc()">
         <label>Angle of Attack (deg)</label><input type="number" id="alpha" value="2" oninput="calc()">
         <label>Airspeed (m/s)</label><input type="number" id="v" value="15" oninput="calc()">
-        <label>Chord (m)</label><input type="number" id="c" value="0.2" oninput="calc()">
-        <canvas id="cvs" height="150"></canvas>
+        <label>Chord (m)</label><input type="number" id="c" value="0.2" step="0.01" oninput="calc()">
+        <canvas id="cvs" width="700" height="150"></canvas>
     </div>
-    <div class="panel"><div class="stat-grid" id="out"></div></div></div>
+    <div class="panel"><h3>Section Data</h3><div class="stat-grid" id="out"></div></div></div>
+
+    <script src="state.js"></script>
     <script>
-        function calc() {
-            let code = document.getElementById('naca').value.toLowerCase();
-            let a = parseFloat(document.getElementById('alpha').value);
-            let v = parseFloat(document.getElementById('v').value);
-            let c = parseFloat(document.getElementById('c').value);
-            
-            let m=0, p=0, t=0.12;
-            if(code === 'clarky') { m=0.034; p=0.3; t=0.117; } 
-            else if(!isNaN(code) && code.length===4) { m=parseInt(code[0])/100; p=parseInt(code[1])/10; t=parseInt(code.substr(2,2))/100; }
-            
-            let alphaRad = a * (Math.PI/180);
-            let a0 = -m * 100; // Thin airfoil zero-lift approx
-            let cl = 2 * Math.PI * (alphaRad - (a0*Math.PI/180));
-            let cd0 = 0.006 + Math.pow(t, 2);
-            let cdi = Math.pow(cl, 2) / (Math.PI * 6 * 0.8); // Assumed AR=6, e=0.8
-            let cd = cd0 + cdi;
-            let re = (1.225 * v * c) / 1.81e-5;
-            let q = 0.5 * 1.225 * v * v;
-            
-            let stats = {
-                "Max Camber": (m*100).toFixed(1)+"%", "Camber Pos": (p*100).toFixed(1)+"%", "Thickness": (t*100).toFixed(1)+"%",
-                "Zero Lift Angle (a0)": a0.toFixed(1)+"°", "Lift Coef (Cl)": cl.toFixed(3), "Drag Coef (Cd)": cd.toFixed(4),
-                "L/D Ratio": (cl/cd).toFixed(1), "Pitch Moment (Cm)": (-Math.PI/2 * m).toFixed(3), "Ideal Alpha": (p*50).toFixed(1)+"°",
-                "Reynolds Number": re.toExponential(2), "Stagnation Pt x/c": (Math.pow(a/15, 2)*0.05).toFixed(3), "Stall Angle (Est)": (12 + t*100).toFixed(1)+"°",
-                "Lift Force/Span": (q*c*cl).toFixed(1)+" N/m", "Drag Force/Span": (q*c*cd).toFixed(1)+" N/m", "L.E. Radius": (1.1019*t*t).toFixed(4),
-                "Mach Crit (Est)": (0.8 - t).toFixed(2), "Profile Drag (Cd0)": cd0.toFixed(4), "Induced Drag (Cdi)": cdi.toFixed(4),
-                "Flow Transition": re>5e5?"Turbulent":"Laminar", "T.E. Angle": (Math.atan(t)*180/Math.PI).toFixed(1)+"°"
-            };
-            
-            document.getElementById('out').innerHTML = Object.entries(stats).map(([k,v]) => `<div class="stat-box">${k}<span>${v}</span></div>`).join('');
-            
-            // Draw
-            let ctx = document.getElementById('cvs').getContext('2d');
-            ctx.clearRect(0,0,300,150); ctx.beginPath(); ctx.moveTo(0,75);
-            for(let i=0; i<=100; i++) {
-                let x = i/100, yt = 5*t*(0.2969*Math.sqrt(x)-0.1260*x-0.3516*x*x+0.2843*Math.pow(x,3)-0.1015*Math.pow(x,4));
-                ctx.lineTo(x*280 + 10, 75 - yt*280);
+        const st = RCState.get();
+        document.getElementById('naca').value = st.airfoilCode || '2412';
+        document.getElementById('alpha').value = st.alpha_deg ?? 2;
+        document.getElementById('v').value = st.airspeed_ms ?? 15;
+        if (st.rootChord_cm) document.getElementById('c').value = (st.rootChord_cm / 100).toFixed(3);
+
+        /* ---------- NACA 4-digit camber line slope, dyc/dx ----------
+           Abbott & Von Doenhoff, Theory of Wing Sections, Ch.6.
+           m = max camber (fraction of chord), p = location of max camber (fraction of chord) */
+        function camberSlope(x, m, p) {
+            if (m === 0 || p === 0 || p === 1) return 0;
+            if (x < p) return (2 * m / (p * p)) * (p - x);
+            return (2 * m / Math.pow(1 - p, 2)) * (p - x);
+        }
+
+        /* ---------- Thin Airfoil Theory (Glauert series) ----------
+           Anderson, Fundamentals of Aerodynamics, Ch.4.
+           x(theta) = (1 - cos theta) / 2 maps theta in [0,pi] to x in [0,1].
+             alpha_L0 = -(1/pi) * INT[0,pi] (dyc/dx)(cos(theta0)-1) d(theta0)
+             A1       =  (2/pi) * INT[0,pi] (dyc/dx) cos(theta0)   d(theta0)
+             A2       =  (2/pi) * INT[0,pi] (dyc/dx) cos(2 theta0) d(theta0)
+             Cl       = 2*pi*(alpha - alpha_L0)              [alpha in radians]
+             Cm,c/4   = (pi/4) * (A2 - A1)                    [= Cm about the aerodynamic
+                                                                 center, constant with alpha —
+                                                                 this IS the thin-airfoil result
+                                                                 that the a.c. sits at the
+                                                                 quarter-chord]
+           Integrals evaluated numerically (trapezoidal rule, N=400) since the
+           closed-form NACA camber line is piecewise. */
+        function thinAirfoilTheory(m, p) {
+            const N = 400, dTheta = Math.PI / N;
+            let intA0 = 0, intA1 = 0, intA2 = 0;
+            for (let i = 0; i <= N; i++) {
+                const theta = i * dTheta;
+                const x = (1 - Math.cos(theta)) / 2;
+                const slope = camberSlope(x, m, p);
+                const weight = (i === 0 || i === N) ? 0.5 : 1; // trapezoidal end weights
+                intA0 += weight * slope * (Math.cos(theta) - 1);
+                intA1 += weight * slope * Math.cos(theta);
+                intA2 += weight * slope * Math.cos(2 * theta);
             }
-            ctx.stroke();
-        } calc();
+            intA0 *= dTheta; intA1 *= dTheta; intA2 *= dTheta;
+            const alphaL0 = -(1 / Math.PI) * intA0;      // radians
+            const A1 = (2 / Math.PI) * intA1;
+            const A2 = (2 / Math.PI) * intA2;
+            const CmC4 = (Math.PI / 4) * (A2 - A1);
+            return { alphaL0, A1, A2, CmC4 };
+        }
+
+        function calc() {
+            const code = document.getElementById('naca').value.toLowerCase().trim();
+            const a = parseFloat(document.getElementById('alpha').value);
+            const v = parseFloat(document.getElementById('v').value);
+            const c = parseFloat(document.getElementById('c').value);
+
+            let m = 0, p = 0.4, t = 0.12;
+            if (code === 'clarky') { m = 0.034; p = 0.3; t = 0.117; }
+            else if (/^\d{4}$/.test(code)) {
+                m = parseInt(code[0]) / 100;
+                p = parseInt(code[1]) / 10;
+                t = parseInt(code.substr(2, 2)) / 100;
+                if (p === 0) p = 0.4; // avoid /0 in camber slope for e.g. m>0,p=0 (degenerate input)
+            }
+
+            const alphaRad = a * Math.PI / 180;
+            const { alphaL0, CmC4 } = thinAirfoilTheory(m, p);
+            const alphaL0_deg = alphaL0 * 180 / Math.PI;
+
+            // Lift coefficient, thin airfoil theory: Cl = 2*pi*(alpha - alpha_L0)
+            const cl = 2 * Math.PI * (alphaRad - alphaL0);
+
+            // Profile (form+skin-friction) drag: thickness-based approximation
+            // commonly used in low-fidelity RC sizing tools, NOT a boundary-layer
+            // solution. For real numbers, run XFOIL/XFLR5 at the target Re.
+            const cd0 = 0.006 + Math.pow(t, 2);
+            // Induced drag, classical Prandtl lifting-line theory (Anderson Ch.5):
+            // Cdi = Cl^2 / (pi * AR * e).  AR and span efficiency e assumed here
+            // (AR=6, e=0.8) since this module analyzes the 2D section only.
+            const AR_assumed = 6, e_assumed = 0.8;
+            const cdi = Math.pow(cl, 2) / (Math.PI * AR_assumed * e_assumed);
+            const cd = cd0 + cdi;
+
+            const rho = 1.225, mu = 1.81e-5;
+            const re = (rho * v * c) / mu;                 // Re = rho*V*c/mu
+            const q = 0.5 * rho * v * v;                    // dynamic pressure
+
+            // Transition estimate: critical Reynolds number for natural
+            // laminar-turbulent transition on a smooth flat plate/airfoil,
+            // Re_crit ~ 5e5 (Schlichting, Boundary-Layer Theory — commonly
+            // used as a rule-of-thumb band for RC-scale low-Re aerodynamics).
+            const reCrit = 5e5;
+            const xTransFrac = Math.min(1, reCrit / re);
+            const flowNote = re > reCrit
+                ? `Transition predicted near x/c ≈ ${xTransFrac.toFixed(2)} (Re_crit≈5e5 rule of thumb).`
+                : `Chord Re below Re_crit≈5e5 — flow likely stays laminar over most of the chord; watch for laminar separation bubbles below Re≈2e5.`;
+
+            const stats = {
+                'Max Camber': (m * 100).toFixed(1) + '%',
+                'Camber Pos': (p * 100).toFixed(1) + '%',
+                'Thickness': (t * 100).toFixed(1) + '%',
+                'Zero-Lift Angle (α₀)': { value: alphaL0_deg.toFixed(2) + '°', note: 'Numerically integrated thin-airfoil-theory result: α₀ = -(1/π)∫(dyc/dx)(cosθ-1)dθ — Anderson, Fundamentals of Aerodynamics.' },
+                'Lift Coef (Cl)': { value: cl.toFixed(3), note: 'Cl = 2π(α - α₀), thin airfoil theory. Valid for attached, subsonic, low-camber flow only.' },
+                'Drag Coef (Cd)': { value: cd.toFixed(4), note: 'Cd = Cd0 (thickness-based empirical) + Cdi (Prandtl lifting-line, AR=6/e=0.8 assumed).' },
+                'L/D Ratio': (cl / cd).toFixed(1),
+                'Pitch Moment about a.c. (Cm,c/4)': { value: CmC4.toFixed(3), note: 'Cm,c/4 = (π/4)(A2-A1), Glauert Fourier coefficients of the camber-line slope. Constant with α — the thin-airfoil-theory definition of the aerodynamic center.' },
+                'Aerodynamic Center': { value: '25.0% chord', note: 'Thin airfoil theory places the a.c. at the quarter-chord for any camber distribution (Abbott & Von Doenhoff).' },
+                'Ideal (Design) Alpha': (p * 50).toFixed(1) + '°',
+                'Reynolds Number': { value: re.toExponential(2), note: 'Re = ρVc/μ, ρ=1.225 kg/m³, μ=1.81×10⁻⁵ Pa·s (sea level, 15°C).' },
+                'Transition Estimate': { value: (xTransFrac * 100).toFixed(0) + '% chord', note: flowNote },
+                'Stall Angle (Est)': { value: (12 + t * 100).toFixed(1) + '°', note: 'Empirical rule of thumb only (thickness-correlated). Real stall angle depends strongly on camber, Re and surface finish — validate against wind-tunnel or XFOIL polar data.' },
+                'Lift Force / Span': (q * c * cl).toFixed(1) + ' N/m',
+                'Drag Force / Span': (q * c * cd).toFixed(1) + ' N/m',
+                'L.E. Radius': { value: (1.1019 * t * t).toFixed(4) + ' c', note: 'r_LE/c = 1.1019·t² — closed-form NACA 4-digit leading-edge radius (Abbott & Von Doenhoff).' },
+                'Mach Crit (Est)': (0.8 - t).toFixed(2),
+                'Profile Drag (Cd0)': cd0.toFixed(4),
+                'Induced Drag (Cdi)': { value: cdi.toFixed(4), note: 'Cdi = Cl²/(π·AR·e), Prandtl lifting-line theory (Anderson Ch.5). AR=6, e=0.8 assumed for this 2D-section view.' },
+                'Flow Regime': re > reCrit ? 'Transitional/Turbulent' : 'Laminar-dominated',
+                'T.E. Angle': (Math.atan(t) * 180 / Math.PI).toFixed(1) + '°'
+            };
+
+            RCState.renderStats(document.getElementById('out'), stats);
+            RCState.set({ airfoilCode: code, alpha_deg: a, airspeed_ms: v });
+
+            // Draw section: NACA 4-digit thickness distribution + camber line
+            const ctx = document.getElementById('cvs').getContext('2d');
+            ctx.clearRect(0, 0, 700, 150);
+            ctx.strokeStyle = '#93a2b8'; ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (let i = 0; i <= 100; i++) {
+                const x = i / 100;
+                const yc = x < p ? (m / (p * p || 1)) * (2 * p * x - x * x) : (m / Math.pow(1 - p, 2)) * ((1 - 2 * p) + 2 * p * x - x * x);
+                const yUp = yc + 5 * t * (0.2969 * Math.sqrt(x) - 0.1260 * x - 0.3516 * x * x + 0.2843 * Math.pow(x, 3) - 0.1015 * Math.pow(x, 4));
+                const px = x * 620 + 20, py = 75 - yUp * 300;
+                if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+            }
+            for (let i = 100; i >= 0; i--) {
+                const x = i / 100;
+                const yc = x < p ? (m / (p * p || 1)) * (2 * p * x - x * x) : (m / Math.pow(1 - p, 2)) * ((1 - 2 * p) + 2 * p * x - x * x);
+                const yLo = yc - 5 * t * (0.2969 * Math.sqrt(x) - 0.1260 * x - 0.3516 * x * x + 0.2843 * Math.pow(x, 3) - 0.1015 * Math.pow(x, 4));
+                ctx.lineTo(x * 620 + 20, 75 - yLo * 300);
+            }
+            ctx.closePath(); ctx.fillStyle = 'rgba(255,122,26,.12)'; ctx.fill();
+            ctx.strokeStyle = '#ff7a1a'; ctx.lineWidth = 1.5; ctx.stroke();
+
+            // camber line dashed
+            ctx.beginPath(); ctx.setLineDash([4, 3]); ctx.strokeStyle = '#3ddbc4';
+            for (let i = 0; i <= 100; i++) {
+                const x = i / 100;
+                const yc = x < p ? (m / (p * p || 1)) * (2 * p * x - x * x) : (m / Math.pow(1 - p, 2)) * ((1 - 2 * p) + 2 * p * x - x * x);
+                const px = x * 620 + 20, py = 75 - yc * 300;
+                if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+            }
+            ctx.stroke(); ctx.setLineDash([]);
+        }
+        calc();
     </script>
 </body></html>

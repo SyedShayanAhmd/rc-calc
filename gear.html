@@ -1,33 +1,117 @@
 <!DOCTYPE html>
-<html><head><link rel="stylesheet" href="style.css"></head><body>
-    <div class="nav">
-        <a href="index.html">1. Sizer</a><a href="airfoil.html">2. Airfoil</a>
-        <a href="electronics.html">3. Electronics</a><a href="cg.html">4. CG Analysis</a>
-        <a href="gear.html" class="active">5. Landing Gear</a><a href="viewer.html">6. 3D Viewer</a>
+<html><head><meta charset="UTF-8"><title>RC Sizing Suite — 5. Landing Gear</title><link rel="stylesheet" href="style.css"></head><body>
+    <div class="suite-header">
+        <div class="suite-title"><span class="mark"></span>RC SIZING &amp; ANALYSIS SUITE</div>
+        <div class="suite-sub">CLIENT-SIDE · NO SERVER · LOCALSTORAGE STATE</div>
     </div>
+    <div class="nav">
+        <a href="index.html"><span class="n">1</span>Sizer</a><a href="airfoil.html"><span class="n">2</span>Airfoil</a>
+        <a href="electronics.html"><span class="n">3</span>Electronics</a><a href="cg.html"><span class="n">4</span>CG Analysis</a>
+        <a href="gear.html" class="active"><span class="n">5</span>Landing Gear</a><a href="viewer.html"><span class="n">6</span>3D Viewer</a>
+        <a href="help.html"><span class="n">?</span>Get Started</a>
+    </div>
+
+    <div class="sync-flag"><span class="dot"></span>CG position comes from the CG Analysis tab.</div>
+
     <div class="grid"><div class="panel">
+        <h3>Geometry Inputs</h3>
         <label>Propeller Clearance Required (cm)</label><input type="number" id="clr" value="5" oninput="calc()">
         <label>Propeller Radius (cm)</label><input type="number" id="pr" value="12" oninput="calc()">
         <label>Main Wheel Dia (cm)</label><input type="number" id="mw" value="6" oninput="calc()">
         <label>Nose/Tail Wheel Dia (cm)</label><input type="number" id="nw" value="4" oninput="calc()">
         <label>Configuration</label><select id="cfg" onchange="calc()"><option>Tricycle</option><option>Taildragger</option></select>
+        <label>CG Height Above Ground (cm)</label><input type="number" id="cgh" value="9" oninput="calc()">
+        <label>Main Gear Track Width (cm)</label><input type="number" id="track" value="22" oninput="calc()">
+        <label>Main Gear Position from Nose (mm)</label><input type="number" id="mgpos" value="340" oninput="calc()">
+        <label>Takeoff Rotation Angle (deg)</label><input type="number" id="rot" value="12" oninput="calc()">
     </div>
-    <div class="panel"><div class="stat-grid" id="g_out"></div></div></div>
+    <div class="panel"><h3>Ground Handling Data</h3><div class="stat-grid" id="g_out"></div></div></div>
+
+    <script src="state.js"></script>
     <script>
+        const st = RCState.get();
+        document.getElementById('clr').value = st.propClearance_cm;
+        document.getElementById('pr').value = st.propRadius_cm;
+        document.getElementById('mw').value = st.mainWheelDia_cm;
+        document.getElementById('nw').value = st.noseWheelDia_cm;
+        document.getElementById('cgh').value = st.cgHeight_cm;
+        document.getElementById('track').value = st.trackWidth_cm;
+        document.getElementById('mgpos').value = st.mainGearPos_mm;
+        document.getElementById('rot').value = st.rotationAngle_deg;
+        if (st.gearConfig) document.getElementById('cfg').value = st.gearConfig;
+
         function calc() {
-            let clr = Number(document.getElementById('clr').value), pr = Number(document.getElementById('pr').value);
-            let mw = Number(document.getElementById('mw').value), nw = Number(document.getElementById('nw').value);
-            let isTri = document.getElementById('cfg').value === 'Tricycle';
-            
-            let strutHeight = pr + clr - (mw/2); // Basic geometric clearance
-            let cgAngle = isTri ? "15° behind CG" : "15° ahead of CG";
-            
-            document.getElementById('g_out').innerHTML = `
-                <div class="stat-box">Min Axis Height<span>${pr+clr} cm</span></div>
-                <div class="stat-box">Main Strut Length<span>${strutHeight} cm</span></div>
-                <div class="stat-box">Main Gear Placement<span>${cgAngle}</span></div>
-                <div class="stat-box">Stance Width (Tip-over)<span>${(strutHeight*1.5).toFixed(1)} cm</span></div>
-            `;
-        } calc();
+            const clr = Number(document.getElementById('clr').value);
+            const pr = Number(document.getElementById('pr').value);
+            const mw = Number(document.getElementById('mw').value);
+            const nw = Number(document.getElementById('nw').value);
+            const cfg = document.getElementById('cfg').value;
+            const isTri = cfg === 'Tricycle';
+            const cgH_cm = Number(document.getElementById('cgh').value);
+            const track_cm = Number(document.getElementById('track').value);
+            const mgPos_mm = Number(document.getElementById('mgpos').value);
+            const rot_deg = Number(document.getElementById('rot').value);
+
+            const liveState = RCState.get();
+            const cgPos_mm = (liveState.cgPosition_mm != null) ? liveState.cgPosition_mm : 220;
+
+            // --- Static ground / prop-strike clearance ---
+            // Basic geometric requirement: prop tip must clear the ground by
+            // at least `clr` cm when stationary.
+            const minAxisHeight = pr + clr;                 // prop-axis height above ground
+            const strutLength = minAxisHeight - (mw / 2);    // strut length to the main axle
+
+            // --- Tip-back (rotation authority) angle, Raymer Ch.11 ---
+            // Angle from the vertical at the main-gear ground-contact point up
+            // to the CG. Must exceed the intended takeoff rotation angle (with
+            // a few degrees of margin) or the tail/aft fuselage strikes the
+            // ground before rotation is complete.
+            const L_main_mm = mgPos_mm - cgPos_mm;   // main gear aft of CG (mm)
+            const H_cg_mm = cgH_cm * 10;
+            const tipBackAngle = H_cg_mm > 0 ? Math.atan2(L_main_mm, H_cg_mm) * 180 / Math.PI : 0;
+            const rotationMargin = tipBackAngle - rot_deg;
+
+            // --- Lateral overturn angle, Raymer Ch.11 (simplified 2D form) ---
+            // Angle from vertical at CG to the main-gear contact point, in the
+            // roll plane. Raymer's full form also folds in wheelbase geometry
+            // for turning cases; this simplified version checks straight-line
+            // tip-over risk only. Design guidance: keep well under ~55-63°.
+            const overturnAngle = cgH_cm > 0 ? Math.atan2(track_cm / 2, cgH_cm) * 180 / Math.PI : 0;
+
+            // --- Prop-strike clearance during rotation ---
+            // As the aircraft rotates nose-up about the main gear by `rot_deg`,
+            // a tractor prop mounted near the nose gains height (moves further
+            // from the ground), so clearance IMPROVES during rotation. Height
+            // gained approximated as an arc: dh = L_prop_to_mainGear * sin(rot).
+            // (Pusher-prop or tail-mounted configurations are NOT covered by
+            // this simplified model — check those separately.)
+            const rotRad = rot_deg * Math.PI / 180;
+            const propToMainGear_mm = mgPos_mm; // assumes tractor prop near the absolute nose
+            const heightGain_cm = (propToMainGear_mm / 10) * Math.sin(rotRad);
+            const rotationClearance_cm = clr + heightGain_cm;
+
+            document.getElementById('g_out').innerHTML = '';
+            RCState.renderStats(document.getElementById('g_out'), {
+                'Min Prop-Axis Height': { value: (pr + clr).toFixed(1) + ' cm', note: 'Prop radius + required static clearance. Basic geometric ground-clearance requirement.' },
+                'Main Strut Length': { value: strutLength.toFixed(1) + ' cm', note: 'Strut length to the axle = (prop radius + clearance) − main-wheel radius.' },
+                'Main Gear Placement': isTri ? 'Aft of CG (Tricycle)' : 'Near/aft of CG (Taildragger)',
+                'Stance Width (Ref.)': (strutLength * 1.5).toFixed(1) + ' cm',
+                'Tip-Back Angle': {
+                    value: tipBackAngle.toFixed(1) + '°',
+                    cls: rotationMargin >= 3 ? 'good' : rotationMargin >= 0 ? 'warn' : 'danger',
+                    note: 'θ = atan(main-gear-to-CG distance / CG height) — Raymer, Aircraft Design: A Conceptual Approach, Ch.11. Should exceed the rotation angle by a few degrees of margin.'
+                },
+                'Rotation Margin': {
+                    value: (rotationMargin >= 0 ? '+' : '') + rotationMargin.toFixed(1) + '°',
+                    cls: rotationMargin >= 3 ? 'good' : rotationMargin >= 0 ? 'warn' : 'danger',
+                    note: 'Tip-back angle minus the takeoff rotation angle input. Negative means a tail-strike risk before rotation is achieved.'
+                },
+                'Lateral Overturn Angle': { value: overturnAngle.toFixed(1) + '°', cls: overturnAngle <= 55 ? 'good' : overturnAngle <= 63 ? 'warn' : 'danger', note: 'θ = atan((track/2) / CG height), simplified from Raymer Ch.11. Design goal: keep below ~55–63° for safe ground handling in turns.' },
+                'Rotation Clearance': { value: rotationClearance_cm.toFixed(1) + ' cm', note: 'Static clearance plus the height a nose-mounted tractor prop gains as the aircraft rotates about the main gear (dh ≈ L·sin(θ_rotation)). Improves during rotation for tractor configs; pusher/tail props are not modeled here.' }
+            });
+
+            RCState.set({ propClearance_cm: clr, propRadius_cm: pr, mainWheelDia_cm: mw, noseWheelDia_cm: nw, gearConfig: cfg, cgHeight_cm: cgH_cm, trackWidth_cm: track_cm, mainGearPos_mm: mgPos_mm, rotationAngle_deg: rot_deg });
+        }
+        calc();
     </script>
 </body></html>
