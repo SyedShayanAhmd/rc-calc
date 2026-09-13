@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html><head><link rel="stylesheet" href="style.css"></head><body>
+    <div class="nav">
+        <a href="index.html">1. Sizer</a><a href="airfoil.html">2. Airfoil</a>
+        <a href="electronics.html">3. Electronics</a><a href="cg.html">4. CG Analysis</a>
+        <a href="gear.html" class="active">5. Landing Gear</a><a href="viewer.html">6. 3D Viewer</a>
+    </div>
+    <div class="grid"><div class="panel">
+        <label>Propeller Clearance Required (cm)</label><input type="number" id="clr" value="5" oninput="calc()">
+        <label>Propeller Radius (cm)</label><input type="number" id="pr" value="12" oninput="calc()">
+        <label>Main Wheel Dia (cm)</label><input type="number" id="mw" value="6" oninput="calc()">
+        <label>Nose/Tail Wheel Dia (cm)</label><input type="number" id="nw" value="4" oninput="calc()">
+        <label>Configuration</label><select id="cfg" onchange="calc()"><option>Tricycle</option><option>Taildragger</option></select>
+    </div>
+    <div class="panel"><div class="stat-grid" id="g_out"></div></div></div>
+    <script>
+        function calc() {
+            let clr = Number(document.getElementById('clr').value), pr = Number(document.getElementById('pr').value);
+            let mw = Number(document.getElementById('mw').value), nw = Number(document.getElementById('nw').value);
+            let isTri = document.getElementById('cfg').value === 'Tricycle';
+            
+            let strutHeight = pr + clr - (mw/2); // Basic geometric clearance
+            let cgAngle = isTri ? "15° behind CG" : "15° ahead of CG";
+            
+            document.getElementById('g_out').innerHTML = `
+                <div class="stat-box">Min Axis Height<span>${pr+clr} cm</span></div>
+                <div class="stat-box">Main Strut Length<span>${strutHeight} cm</span></div>
+                <div class="stat-box">Main Gear Placement<span>${cgAngle}</span></div>
+                <div class="stat-box">Stance Width (Tip-over)<span>${(strutHeight*1.5).toFixed(1)} cm</span></div>
+            `;
+        } calc();
+    </script>
+</body></html>
