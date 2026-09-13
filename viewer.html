@@ -1,18 +1,39 @@
 <!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>RC Suite — 3D Viewer</title><link rel="stylesheet" href="style.css">
+<style>
+    #viewer-wrapper { position: relative; width: 100%; height: 600px; border: 1px solid var(--border-strong); border-radius: 4px; overflow: hidden; }
+    #3d-container { width: 100%; height: 100%; }
+    .view-toolbar { position: absolute; top: 15px; left: 15px; display: flex; flex-direction: column; gap: 6px; z-index: 10; }
+    .view-btn { background: rgba(22, 27, 34, 0.85); color: var(--text-dim); border: 1px solid var(--border-strong); padding: 6px 12px; font-family: var(--font-mono); font-size: 10px; cursor: pointer; text-transform: uppercase; border-radius: 2px; transition: all 0.15s; }
+    .view-btn:hover { background: var(--accent); color: #161b22; border-color: var(--accent); }
+    .view-btn.active { background: var(--teal); color: #161b22; border-color: var(--teal); }
+</style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script><script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script></head><body>
     <div class="nav"><a href="index.html">1. Sizer</a><a href="airfoil.html">2. Airfoil</a><a href="electronics.html">3. Electronics</a><a href="cg.html">4. CG</a><a href="gear.html">5. Gear</a><a href="viewer.html" class="active">6. 3D</a><a href="help.html">? Help</a></div>
     
     <div class="sync-flag"><span class="dot"></span>Internal components (Motor, Battery, ESC) are synced live from your CG Analysis table.</div>
 
-    <div class="panel tick">
-        <div id="3d-container" style="height: 600px; width: 100%;"></div>
+    <div class="panel tick" style="padding: 10px;">
+        <div id="viewer-wrapper">
+            <div class="view-toolbar">
+                <button class="view-btn" onclick="toggleXRay()" id="btn-xray">Toggle X-Ray</button>
+                <div style="height: 10px;"></div>
+                <button class="view-btn" onclick="setView('iso')">Isometric</button>
+                <button class="view-btn" onclick="setView('top')">Top</button>
+                <button class="view-btn" onclick="setView('bottom')">Bottom</button>
+                <button class="view-btn" onclick="setView('left')">Left</button>
+                <button class="view-btn" onclick="setView('right')">Right</button>
+                <button class="view-btn" onclick="setView('front')">Front</button>
+                <button class="view-btn" onclick="setView('back')">Back</button>
+            </div>
+            <div id="3d-container"></div>
+        </div>
     </div>
     
     <script src="state.js"></script><script>
         const container = document.getElementById('3d-container');
         const scene = new THREE.Scene(); 
-        scene.background = new THREE.Color(0x1c2a39); 
+        scene.background = new THREE.Color(0x131820); // Darker CAD aesthetic
         
         const camera = new THREE.PerspectiveCamera(45, container.clientWidth/600, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({antialias:true});
@@ -36,14 +57,29 @@
         const fillLight = new THREE.DirectionalLight(0xaabbcc, 0.4);
         fillLight.position.set(-20, 10, 20);
         scene.add(fillLight);
-        scene.add(new THREE.AmbientLight(0x445566, 0.6));
+        scene.add(new THREE.AmbientLight(0x556677, 0.6));
         
-        const grid = new THREE.GridHelper(200, 100, 0x334455, 0x223344); 
+        const grid = new THREE.GridHelper(200, 100, 0x2b3547, 0x1c2330); 
         grid.position.y = -10;
         scene.add(grid);
 
         let group = new THREE.Group(); 
         scene.add(group);
+
+        // Materials defined globally so X-Ray toggle can update them
+        const matWing = new THREE.MeshPhongMaterial({color: 0xff7a1a, flatShading: false, side: THREE.DoubleSide});
+        const matTail = new THREE.MeshPhongMaterial({color: 0x3ddbc4, flatShading: false, side: THREE.DoubleSide});
+        const matFuse = new THREE.MeshPhongMaterial({color: 0x93a2b8, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide});
+        
+        let isXRay = false;
+        function toggleXRay() {
+            isXRay = !isXRay;
+            document.getElementById('btn-xray').classList.toggle('active', isXRay);
+            const op = isXRay ? 0.25 : 1.0;
+            matWing.opacity = op; matWing.transparent = isXRay;
+            matTail.opacity = op; matTail.transparent = isXRay;
+            matFuse.opacity = isXRay ? 0.15 : 0.9;
+        }
 
         function getNACAShape(code, chord) {
             const shape = new THREE.Shape();
@@ -79,56 +115,57 @@
             while(group.children.length) group.remove(group.children[0]);
             
             const st = RCState.get();
-            const fL = (st.fuselageLength_mm || st.fuseLength_cm*10 || 850) / 10; // cm
+            const fL = (st.fuselageLength_mm || st.fuseLength_cm*10 || 850) / 10; 
             const fH = st.fuseHeight_cm || (fL * 0.1);
             const fuseW = (st.rootChord_cm || 25) * 0.35;
             
             const spanHalf = (st.span_cm || 120)/2;
             const rC = st.rootChord_cm || 25;
             const taper = st.taperRatio || 0.6;
-            const le = (st.wingLEPosition_mm || 250) / 10; // Z-position of wing leading edge
+            const le = (st.wingLEPosition_mm || 250) / 10; 
             
             const hsSpanHalf = (st.hsSpan_cm || 38)/2;
             const hsC = st.hsChord_cm || 9.6;
             const vsH = st.vsHeight_cm || 13.4;
             const vsC = st.vsChord_cm || 8.9;
 
-            const matWing = new THREE.MeshPhongMaterial({color: 0xff7a1a, flatShading: false});
-            const matTail = new THREE.MeshPhongMaterial({color: 0x3ddbc4, flatShading: false});
-            const matFuse = new THREE.MeshPhongMaterial({color: 0x99aabb, transparent: true, opacity: 0.25, depthWrite: false});
-            
             // Fuselage (Origin Z=0 is the nose)
             const fuse = new THREE.Mesh(new THREE.BoxGeometry(fuseW, fH, fL), matFuse);
             fuse.position.set(0, fH/2, fL/2); 
             fuse.castShadow = true;
             group.add(fuse);
 
-            // Wing (Correctly shifted to LE and offset to fuselage sides)
+            // Wing 
             const shape = getNACAShape(st.airfoilCode || '2412', rC);
             
-            const rWing = new THREE.Mesh(createTaperedExtrusion(shape, spanHalf, taper), matWing);
-            rWing.rotation.y = -Math.PI/2; 
-            rWing.position.set(fuseW/2, fH*0.8, le); 
-            rWing.castShadow = true;
-            group.add(rWing);
-            
+            // Left Wing: Rotate -90deg. Span goes along -X. Chord goes +Z (trailing edge to tail).
             const lWing = new THREE.Mesh(createTaperedExtrusion(shape, spanHalf, taper), matWing);
-            lWing.rotation.y = Math.PI/2; 
+            lWing.rotation.y = -Math.PI/2; 
             lWing.position.set(-fuseW/2, fH*0.8, le); 
             lWing.castShadow = true;
             group.add(lWing);
+            
+            // Right Wing: Rotate -90deg, but scale Z by -1 to mirror it along the X-axis. 
+            // Both leading edges now correctly face the nose (Z=0).
+            const rWing = new THREE.Mesh(createTaperedExtrusion(shape, spanHalf, taper), matWing);
+            rWing.rotation.y = -Math.PI/2; 
+            rWing.scale.z = -1; 
+            rWing.position.set(fuseW/2, fH*0.8, le); 
+            rWing.castShadow = true;
+            group.add(rWing);
 
             // Empennage
             const hsShape = getNACAShape('0012', hsC);
-            const rHS = new THREE.Mesh(createTaperedExtrusion(hsShape, hsSpanHalf, 1.0), matTail);
-            rHS.rotation.y = -Math.PI/2; 
-            rHS.position.set(fuseW/2, fH*0.5, fL - hsC); 
-            group.add(rHS);
-            
             const lHS = new THREE.Mesh(createTaperedExtrusion(hsShape, hsSpanHalf, 1.0), matTail);
-            lHS.rotation.y = Math.PI/2; 
+            lHS.rotation.y = -Math.PI/2; 
             lHS.position.set(-fuseW/2, fH*0.5, fL - hsC); 
             group.add(lHS);
+            
+            const rHS = new THREE.Mesh(createTaperedExtrusion(hsShape, hsSpanHalf, 1.0), matTail);
+            rHS.rotation.y = -Math.PI/2; 
+            rHS.scale.z = -1;
+            rHS.position.set(fuseW/2, fH*0.5, fL - hsC); 
+            group.add(rHS);
             
             const vsShape = getNACAShape('0012', vsC);
             const vs = new THREE.Mesh(createTaperedExtrusion(vsShape, vsH, 0.5), matTail);
@@ -145,14 +182,14 @@
                     let mesh;
                     
                     if (name.includes('motor')) {
-                        mesh = new THREE.Mesh(new THREE.CylinderGeometry(fuseW*0.4, fuseW*0.4, fH*0.6, 16), new THREE.MeshPhongMaterial({color: 0x333333}));
+                        mesh = new THREE.Mesh(new THREE.CylinderGeometry(fuseW*0.4, fuseW*0.4, fH*0.6, 16), new THREE.MeshPhongMaterial({color: 0x222222}));
                         mesh.rotation.x = Math.PI/2;
                     } else if (name.includes('battery') || name.includes('batt')) {
                         mesh = new THREE.Mesh(new THREE.BoxGeometry(fuseW*0.7, fH*0.5, fH*1.2), new THREE.MeshPhongMaterial({color: 0x3ddbc4}));
                     } else if (name.includes('esc')) {
                         mesh = new THREE.Mesh(new THREE.BoxGeometry(fuseW*0.5, fH*0.15, fH*0.6), new THREE.MeshPhongMaterial({color: 0xf2b84b}));
                     } else if (!name.includes('wing')) {
-                        mesh = new THREE.Mesh(new THREE.BoxGeometry(fuseW*0.4, fH*0.4, fH*0.4), new THREE.MeshPhongMaterial({color: 0x8899aa}));
+                        mesh = new THREE.Mesh(new THREE.BoxGeometry(fuseW*0.4, fH*0.4, fH*0.4), new THREE.MeshPhongMaterial({color: 0x5b6980}));
                     }
 
                     if(mesh) {
@@ -168,10 +205,32 @@
                 const cg = new THREE.Mesh(new THREE.SphereGeometry(1.5, 16, 16), new THREE.MeshBasicMaterial({color: 0xff6259}));
                 cg.position.set(0, fH*1.2, st.cgPosition_mm/10); 
                 group.add(cg);
+                const cgRod = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, fH*1.4, 8), new THREE.MeshBasicMaterial({color: 0xff6259}));
+                cgRod.position.set(0, fH*0.5, st.cgPosition_mm/10);
+                group.add(cgRod);
             }
 
-            controls.target.set(0, fH/2, fL/2); 
-            camera.position.set(fL*0.8, fL*0.5, -fL*0.4);
+            // Initialize default view
+            setView('iso');
+        }
+        
+        function setView(view) {
+            const st = RCState.get();
+            const fL = (st.fuselageLength_mm || 850) / 10;
+            const fH = st.fuseHeight_cm || (fL * 0.1);
+            const dist = fL * 1.5;
+            const cx = 0, cy = fH/2, cz = fL/2;
+            
+            controls.target.set(cx, cy, cz);
+            if(view === 'top') camera.position.set(cx, dist, cz);
+            if(view === 'bottom') camera.position.set(cx, -dist, cz);
+            if(view === 'left') camera.position.set(-dist, cy, cz);
+            if(view === 'right') camera.position.set(dist, cy, cz);
+            if(view === 'front') camera.position.set(cx, cy, -dist);
+            if(view === 'back') camera.position.set(cx, cy, fL + dist);
+            if(view === 'iso') camera.position.set(dist*0.7, dist*0.6, -dist*0.5);
+            
+            controls.update();
         }
         
         build(); 
