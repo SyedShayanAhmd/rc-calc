@@ -3,230 +3,256 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RC Plane Sizer - Aerodynamic Calculator</title>
+    <title>RC Plane Sizer</title>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f4f7f6;
-            color: #333;
-            max-width: 900px;
-            margin: 40px auto;
-            padding: 20px;
-        }
-        h2 { text-align: center; color: #2c3e50; margin-bottom: 30px; }
-        
-        .container {
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-        }
-
-        .panel {
-            background: #fff;
-            padding: 25px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            flex: 1;
-            min-width: 300px;
-        }
-
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #f4f7f6; color: #333; max-width: 900px; margin: 0 auto; padding: 20px; }
+        .nav { display: flex; gap: 15px; margin-bottom: 30px; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
+        .nav a { text-decoration: none; padding: 10px 20px; background: #ddd; color: #333; border-radius: 4px 4px 0 0; font-weight: bold; }
+        .nav a.active { background: #2980b9; color: white; }
+        .container { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; }
+        .panel { background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); flex: 1; min-width: 300px; }
         .panel h3 { margin-top: 0; color: #2980b9; border-bottom: 2px solid #ecf0f1; padding-bottom: 10px; }
-
-        .input-group, .output-group { margin-bottom: 15px; }
+        .input-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; color: #555; }
-        
-        input[type="number"] { 
-            width: 100%; padding: 10px; box-sizing: border-box; 
-            border: 1px solid #ccc; border-radius: 4px; font-size: 15px;
-            background-color: #fcfcfc;
-        }
-        input[type="number"]:focus { outline: none; border-color: #3498db; }
-
-        .output-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid #eee;
-            font-size: 14px;
-        }
-        .output-row:last-child { border-bottom: none; }
+        input[type="number"], input[type="text"] { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 15px; }
+        .output-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px; }
         .output-label { font-weight: bold; color: #444; }
-        
         .vals { display: flex; gap: 15px; min-width: 160px; justify-content: flex-end;}
         .val-ft { color: #2980b9; font-weight: bold; width: 75px; text-align: right;}
         .val-in { color: #27ae60; font-weight: bold; width: 90px; text-align: right;}
-
-        .weight-callout {
-            background-color: #e8f6f3;
-            padding: 15px;
-            border-radius: 6px;
-            border-left: 4px solid #1abc9c;
-            margin-bottom: 20px;
-            font-size: 15px;
-        }
+        
+        /* Airfoil Specific Styles */
+        .airfoil-stats { display: flex; gap: 20px; background: #e8f6f3; padding: 15px; border-radius: 6px; margin-top: 15px; }
+        .stat-box { flex: 1; text-align: center; }
+        .stat-box span { display: block; font-size: 20px; font-weight: bold; color: #1abc9c; }
+        canvas { width: 100%; height: 200px; border: 1px solid #ddd; border-radius: 4px; margin-top: 15px; background: #fafafa; }
     </style>
 </head>
 <body>
+    <div class="nav">
+        <a href="index.html" class="active">Fixed-Wing Sizer</a>
+        <a href="multicopter.html">Multicopter Calculator</a>
+    </div>
 
-    <h2>RC Plane Aerodynamic Sizer</h2>
-
+    <h2>Fixed-Wing Aerodynamic Sizer</h2>
+    
+    <!-- SIZER TOOL -->
     <div class="container">
-        <!-- INPUT PANEL -->
         <div class="panel">
             <h3>Aircraft Inputs</h3>
-            <div class="input-group">
-                <label>Target Weight (grams)</label>
-                <input type="number" id="weight_g" value="1700" step="10" oninput="calculateSizing()">
+            <div class="input-group"><label>Target Weight (g)</label><input type="number" id="weight_g" value="1700" step="10" oninput="calc()"></div>
+            <div class="input-group"><label>Aspect Ratio</label><input type="number" id="ar" value="5.0" step="0.1" oninput="calc()"></div>
+            <div class="input-group"><label>Wing Cubic Loading (WCL)</label><input type="number" id="wcl" value="8.0" step="0.1" oninput="calc()"></div>
+            <div class="input-group"><label>Taper Ratio</label><input type="number" id="taper" value="0.5" step="0.05" oninput="calc()"></div>
+        </div>
+        
+        <div class="panel">
+            <h3>Calculated Dimensions</h3>
+            <div style="display:flex; justify-content: flex-end; gap: 15px; font-size: 11px; color:#888; font-weight:bold; margin-bottom: 5px;">
+                <span style="width: 75px; text-align: right;">Feet</span><span style="width: 90px; text-align: right;">Inches</span>
             </div>
+            <div class="output-row"><span class="output-label">Wing Area</span><div class="vals"><span class="val-ft" id="area_ft">0</span><span class="val-in" id="area_in">0</span></div></div>
+            <div class="output-row"><span class="output-label">Wing Span</span><div class="vals"><span class="val-ft" id="span_ft">0</span><span class="val-in" id="span_in">0</span></div></div>
+            <div class="output-row"><span class="output-label">Average Chord</span><div class="vals"><span class="val-ft" id="chord_ft">0</span><span class="val-in" id="chord_in">0</span></div></div>
+            <div class="output-row"><span class="output-label">Root Chord</span><div class="vals"><span class="val-ft" id="root_ft">0</span><span class="val-in" id="root_in">0</span></div></div>
+            <div class="output-row"><span class="output-label">Tip Chord</span><div class="vals"><span class="val-ft" id="tip_ft">0</span><span class="val-in" id="tip_in">0</span></div></div>
+            <div class="output-row"><span class="output-label">Fuselage Length</span><div class="vals"><span class="val-ft" id="fuse_l_ft">0</span><span class="val-in" id="fuse_l_in">0</span></div></div>
+            <div class="output-row"><span class="output-label">Horiz. Stab Area</span><div class="vals"><span class="val-ft" id="ahs_ft">0</span><span class="val-in" id="ahs_in">0</span></div></div>
+        </div>
+    </div>
+
+    <!-- AIRFOIL TOOL -->
+    <div class="panel" style="margin-bottom: 40px;">
+        <h3>Airfoil Analysis (NACA 4-Digit)</h3>
+        <p style="font-size: 13px; color: #666; margin-top:-5px;">Enter a 4-digit NACA profile (e.g., 2412 for a standard trainer, 0012 for symmetrical aerobatics, 4415 for high-lift slow flight).</p>
+        
+        <div style="max-width: 300px;">
             <div class="input-group">
-                <label>Aspect Ratio</label>
-                <input type="number" id="ar" value="5.0" step="0.1" oninput="calculateSizing()">
-            </div>
-            <div class="input-group">
-                <label>Wing Cubic Loading (WCL)</label>
-                <input type="number" id="wcl" value="8.0" step="0.1" oninput="calculateSizing()">
-            </div>
-            <div class="input-group">
-                <label>Taper Ratio</label>
-                <input type="number" id="taper" value="0.5" step="0.05" oninput="calculateSizing()">
-            </div>
-            
-            <div style="margin-top: 30px; font-size: 12px; color: #7f8c8d;">
-                <strong>Design Rules Applied:</strong><br>
-                - Fuselage Length = 70% of Wingspan<br>
-                - Horizontal Stab Area = 15% of Wing Area<br>
-                - Vertical Stab Area = 33% of Horiz. Stab Area
+                <label>NACA Profile Number</label>
+                <input type="text" id="naca" value="2412" maxlength="4" oninput="drawAirfoil()">
             </div>
         </div>
 
-        <!-- OUTPUT PANEL -->
-        <div class="panel">
-            <h3>Calculated Dimensions</h3>
-            
-            <div class="weight-callout">
-                <strong>Weight in Ounces:</strong> <span id="weight_oz" style="font-weight: bold; color: #1abc9c;">0</span> oz
-            </div>
+        <canvas id="airfoilCanvas" width="800" height="200"></canvas>
 
-            <div style="display:flex; justify-content: flex-end; gap: 15px; font-size: 11px; color:#888; font-weight:bold; margin-bottom: 5px; padding-right: 5px;">
-                <span style="width: 75px; text-align: right;">Feet (ft / ft²)</span>
-                <span style="width: 90px; text-align: right;">Inches (in / in²)</span>
+        <div class="airfoil-stats">
+            <div class="stat-box">
+                Max Camber
+                <span id="stat-camber">0%</span>
             </div>
-
-            <div class="output-row">
-                <span class="output-label">Wing Area</span>
-                <div class="vals"><span class="val-ft" id="area_ft">0</span><span class="val-in" id="area_in">0</span></div>
+            <div class="stat-box">
+                Max Thickness
+                <span id="stat-thick">0%</span>
             </div>
-            <div class="output-row">
-                <span class="output-label">Wing Span</span>
-                <div class="vals"><span class="val-ft" id="span_ft">0</span><span class="val-in" id="span_in">0</span></div>
+            <div class="stat-box">
+                Zero-Lift Angle (α)
+                <span id="stat-alpha">0°</span>
             </div>
-            <div class="output-row">
-                <span class="output-label">Average Wing Chord</span>
-                <div class="vals"><span class="val-ft" id="chord_ft">0</span><span class="val-in" id="chord_in">0</span></div>
-            </div>
-            <div class="output-row">
-                <span class="output-label">Root Chord</span>
-                <div class="vals"><span class="val-ft" id="root_ft">0</span><span class="val-in" id="root_in">0</span></div>
-            </div>
-            <div class="output-row">
-                <span class="output-label">Tip Chord</span>
-                <div class="vals"><span class="val-ft" id="tip_ft">0</span><span class="val-in" id="tip_in">0</span></div>
-            </div>
-            <div class="output-row">
-                <span class="output-label">Fuselage Length</span>
-                <div class="vals"><span class="val-ft" id="fuse_l_ft">0</span><span class="val-in" id="fuse_l_in">0</span></div>
-            </div>
-            <div class="output-row">
-                <span class="output-label">Fuselage Height</span>
-                <div class="vals"><span class="val-ft" id="fuse_h_ft">0</span><span class="val-in" id="fuse_h_in">0</span></div>
-            </div>
-            <div class="output-row">
-                <span class="output-label">Area of Horiz. Stab (HS)</span>
-                <div class="vals"><span class="val-ft" id="ahs_ft">0</span><span class="val-in" id="ahs_in">0</span></div>
-            </div>
-            <div class="output-row">
-                <span class="output-label">Span (Length) of HS</span>
-                <div class="vals"><span class="val-ft" id="lhs_ft">0</span><span class="val-in" id="lhs_in">0</span></div>
-            </div>
-            <div class="output-row">
-                <span class="output-label">Chord (Width) of HS</span>
-                <div class="vals"><span class="val-ft" id="whs_ft">0</span><span class="val-in" id="whs_in">0</span></div>
-            </div>
-            <div class="output-row">
-                <span class="output-label">Area of Vert. Stab (VS)</span>
-                <div class="vals"><span class="val-ft" id="avs_ft">0</span><span class="val-in" id="avs_in">0</span></div>
-            </div>
-            <div class="output-row">
-                <span class="output-label">Height of VS</span>
-                <div class="vals"><span class="val-ft" id="hvs_ft">0</span><span class="val-in" id="hvs_in">0</span></div>
-            </div>
-            <div class="output-row">
-                <span class="output-label">Chord (Width) of VS</span>
-                <div class="vals"><span class="val-ft" id="wvs_ft">0</span><span class="val-in" id="wvs_in">0</span></div>
+            <div class="stat-box">
+                Est. Lift Slope (Cl/deg)
+                <span id="stat-slope">0.11</span>
             </div>
         </div>
     </div>
 
     <script>
-        function calculateSizing() {
-            // Get inputs
-            const w_g = parseFloat(document.getElementById('weight_g').value) || 0;
+        // --- 1. SIZER CALCULATIONS ---
+        function calc() {
+            const w_oz = (parseFloat(document.getElementById('weight_g').value) || 0) * 0.0353;
             const ar = parseFloat(document.getElementById('ar').value) || 1;
             const wcl = parseFloat(document.getElementById('wcl').value) || 1;
             const taper = parseFloat(document.getElementById('taper').value) || 1;
 
-            // Base conversions matching excel multiplier
-            const w_oz = w_g * 0.0353;
-            
-            // Wing Calculations
-            const area_ft = Math.pow((w_oz / wcl), (2/3));
-            const span_ft = Math.pow((ar * area_ft), 0.5);
-            const chord_ft = area_ft / span_ft;
-            
-            // Fix: Dynamic Root/Tip Chord based on Taper Ratio formula: C_avg = (Cr + Ct)/2
-            const root_ft = (2 * chord_ft) / (1 + taper);
-            const tip_ft = root_ft * taper;
+            const area = Math.pow((w_oz / wcl), (2/3));
+            const span = Math.pow((ar * area), 0.5);
+            const chord = area / span;
+            const root = (2 * chord) / (1 + taper);
 
-            // Fuselage Calculations (70% span rule)
-            const fuse_l_ft = 0.7 * span_ft;
-            const fuse_h_ft = 0.1 * fuse_l_ft;
-
-            // Horizontal Stabilizer Calculations
-            const ahs_ft = 0.15 * area_ft;
-            const whs_ft = 0.15 * fuse_l_ft; // Width / Chord
-            const lhs_ft = ahs_ft / whs_ft; // Length / Span
-
-            // Vertical Stabilizer Calculations
-            const avs_ft = 0.33 * ahs_ft;
-            const wvs_ft = whs_ft; 
-            const hvs_ft = avs_ft / wvs_ft;
-
-            // Update UI Helper function to format 2-3 decimal places and output both ft and inches
-            const updateUI = (id, val_ft, isArea = false) => {
-                const multiplier = isArea ? 144 : 12;
-                document.getElementById(id + '_ft').innerText = val_ft.toFixed(3);
-                document.getElementById(id + '_in').innerText = (val_ft * multiplier).toFixed(3);
+            const update = (id, val, isArea) => {
+                document.getElementById(id + '_ft').innerText = val.toFixed(3);
+                document.getElementById(id + '_in').innerText = (val * (isArea ? 144 : 12)).toFixed(3);
             };
 
-            // Write to DOM
-            document.getElementById('weight_oz').innerText = w_oz.toFixed(2);
-            updateUI('area', area_ft, true);
-            updateUI('span', span_ft);
-            updateUI('chord', chord_ft);
-            updateUI('root', root_ft);
-            updateUI('tip', tip_ft);
-            updateUI('fuse_l', fuse_l_ft);
-            updateUI('fuse_h', fuse_h_ft);
-            updateUI('ahs', ahs_ft, true);
-            updateUI('lhs', lhs_ft);
-            updateUI('whs', whs_ft);
-            updateUI('avs', avs_ft, true);
-            updateUI('hvs', hvs_ft);
-            updateUI('wvs', wvs_ft);
+            update('area', area, true);
+            update('span', span, false);
+            update('chord', chord, false);
+            update('root', root, false);
+            update('tip', root * taper, false);
+            update('fuse_l', 0.7 * span, false);
+            update('ahs', 0.15 * area, true);
         }
 
-        // Run calculation instantly on page load
-        calculateSizing();
+        // --- 2. AIRFOIL GENERATION & ANALYSIS ---
+        function drawAirfoil() {
+            const canvas = document.getElementById('airfoilCanvas');
+            const ctx = canvas.getContext('2d');
+            let naca = document.getElementById('naca').value.trim();
+            
+            // Validate input
+            if(naca.length !== 4 || isNaN(naca)) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = "red";
+                ctx.fillText("Please enter a valid 4-digit number", 10, 20);
+                return;
+            }
+
+            // Parse NACA variables
+            const m = parseInt(naca.charAt(0)) / 100;       // Max camber
+            const p = parseInt(naca.charAt(1)) / 10;        // Location of max camber
+            const t = parseInt(naca.substring(2, 4)) / 100; // Max thickness
+
+            const pointsU = [];
+            const pointsL = [];
+            const numPoints = 100; // Resolution
+
+            // Generate geometry using NACA equations
+            for (let i = 0; i <= numPoints; i++) {
+                // Cosine spacing for better leading edge resolution
+                const beta = i * (Math.PI / numPoints);
+                const x = 0.5 * (1 - Math.cos(beta)); 
+                
+                // Thickness distribution
+                const yt = 5 * t * (0.2969*Math.sqrt(x) - 0.1260*x - 0.3516*Math.pow(x,2) + 0.2843*Math.pow(x,3) - 0.1015*Math.pow(x,4));
+                
+                // Camber line and angle
+                let yc = 0;
+                let dyc_dx = 0;
+                
+                if (m > 0) {
+                    if (x >= 0 && x <= p) {
+                        yc = (m / Math.pow(p, 2)) * (2 * p * x - Math.pow(x, 2));
+                        dyc_dx = (2 * m / Math.pow(p, 2)) * (p - x);
+                    } else if (x > p && x <= 1) {
+                        yc = (m / Math.pow(1 - p, 2)) * ((1 - 2 * p) + 2 * p * x - Math.pow(x, 2));
+                        dyc_dx = (2 * m / Math.pow(1 - p, 2)) * (p - x);
+                    }
+                }
+                
+                const theta = Math.atan(dyc_dx);
+                
+                // Upper surface coordinates
+                pointsU.push({
+                    x: x - yt * Math.sin(theta),
+                    y: yc + yt * Math.cos(theta)
+                });
+                
+                // Lower surface coordinates
+                pointsL.push({
+                    x: x + yt * Math.sin(theta),
+                    y: yc - yt * Math.cos(theta)
+                });
+            }
+
+            // --- Canvas Drawing ---
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Grid lines
+            ctx.strokeStyle = "#eee";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height/2); ctx.lineTo(canvas.width, canvas.height/2);
+            ctx.stroke();
+
+            // Set up scaling (Chord line fills 80% of canvas)
+            const scale = canvas.width * 0.8;
+            const offsetX = canvas.width * 0.1;
+            const offsetY = canvas.height / 2;
+
+            ctx.beginPath();
+            ctx.strokeStyle = "#2980b9";
+            ctx.fillStyle = "rgba(41, 128, 185, 0.2)";
+            ctx.lineWidth = 2;
+
+            // Draw Upper Surface
+            ctx.moveTo(offsetX + pointsU[0].x * scale, offsetY - pointsU[0].y * scale);
+            for (let i = 1; i <= numPoints; i++) {
+                ctx.lineTo(offsetX + pointsU[i].x * scale, offsetY - pointsU[i].y * scale);
+            }
+            
+            // Draw Lower Surface (Backwards to close the shape)
+            for (let i = numPoints; i >= 0; i--) {
+                ctx.lineTo(offsetX + pointsL[i].x * scale, offsetY - pointsL[i].y * scale);
+            }
+
+            ctx.closePath();
+            ctx.stroke();
+            ctx.fill();
+
+            // Draw Camber Line
+            if (m > 0) {
+                ctx.beginPath();
+                ctx.strokeStyle = "#e74c3c";
+                ctx.setLineDash([5, 5]); // Dashed line
+                ctx.lineWidth = 1;
+                for (let i = 0; i <= numPoints; i++) {
+                    const beta = i * (Math.PI / numPoints);
+                    const x = 0.5 * (1 - Math.cos(beta));
+                    let yc = 0;
+                    if (x <= p) yc = (m / Math.pow(p, 2)) * (2 * p * x - Math.pow(x, 2));
+                    else yc = (m / Math.pow(1 - p, 2)) * ((1 - 2 * p) + 2 * p * x - Math.pow(x, 2));
+                    
+                    if (i === 0) ctx.moveTo(offsetX + x * scale, offsetY - yc * scale);
+                    else ctx.lineTo(offsetX + x * scale, offsetY - yc * scale);
+                }
+                ctx.stroke();
+                ctx.setLineDash([]); // Reset dash
+            }
+
+            // --- Update Analysis Stats ---
+            document.getElementById('stat-camber').innerText = (m * 100).toFixed(1) + "%";
+            document.getElementById('stat-thick').innerText = (t * 100).toFixed(1) + "%";
+            
+            // Thin Airfoil Theory: Zero lift angle approx -100 * max_camber
+            const alphaZero = m === 0 ? 0 : (-100 * m).toFixed(1); 
+            document.getElementById('stat-alpha').innerText = alphaZero + "°";
+            
+            // Theoretical lift slope is always ~2*pi per radian, which is 0.11 per degree
+            document.getElementById('stat-slope').innerText = "0.11";
+        }
+
+        // Initialize both
+        calc();
+        drawAirfoil();
     </script>
 </body>
 </html>
